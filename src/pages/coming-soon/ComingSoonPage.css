@@ -1,0 +1,3 @@
+.coming-soon-box { min-height: 420px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; border: 1px solid var(--line); background: var(--white); color: var(--muted); }
+.coming-soon-box h2 { margin: 18px 0 6px; color: var(--ink); }
+.coming-soon-box p { margin: 0; font-size: 12px; line-height: 1.7; }

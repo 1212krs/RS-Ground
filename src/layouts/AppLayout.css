@@ -1,0 +1,29 @@
+.app-shell {
+  --lime: #D9E5B7;
+  --blue: #BDD7E5;
+  --coral: #EAB8A9;
+  --violet: #D4C9E5;
+  --lime-strong: #AFC779;
+  --blue-strong: #82B2CA;
+  --coral-strong: #D98C78;
+  --violet-strong: #A996C8;
+  --paper: #F2F5F4;
+  --paper-2: #E6EBE9;
+  --white: #FBFCFB;
+  --line: #D3DAD7;
+  --muted: #6F7773;
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: var(--sidebar) 1fr;
+  background: var(--paper);
+}
+
+.main-area { grid-column: 2; min-width: 0; min-height: 100vh; }
+.page-content { padding: 42px 3.2vw 70px; max-width: 1600px; margin: auto; }
+.main-area.main-dark { background: #0d0d0d; }
+
+@media (max-width: 760px) {
+  .app-shell { display: block; }
+  .main-area { min-width: 0; }
+  .page-content { padding: 27px 16px 50px; }
+}

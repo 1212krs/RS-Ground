@@ -1,0 +1,58 @@
+.nx { --bg: #141414; --cream: #F7F2E7; --grey: #9a9a9a;
+  --violet: #7C6FF3; --green: #12A150; --orange: #F26B3E; --yellow: #F5B301; --blue: #4589F0; --lime: #AEE63E; --logo: #FB5A1E;
+  height: 100vh; display: flex; flex-direction: column; background: var(--bg); color: var(--cream);
+  font-family: 'General Sans', system-ui, sans-serif; overflow: hidden; }
+
+.nx-nav { display: flex; justify-content: center; align-items: center; gap: 6px; padding: 16px 20px 8px; }
+.nx-nav-bar { display: flex; align-items: center; gap: 26px; height: 40px; padding: 0 22px 0 6px; background: #1c1c1c; border-radius: 12px 20px 20px 12px; }
+.nx-logo { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 9px; background: var(--logo); color: #fff; font-weight: 800; font-size: 19px; font-style: italic; transform: skewX(-6deg); }
+.nx-nav-bar a { color: #d8d6cf; font-size: 13.5px; font-weight: 500; text-decoration: none; transition: color .16s; }
+.nx-nav-bar a:hover { color: #fff; }
+.nx-login { height: 40px; padding: 0 24px; border: 0; border-radius: 20px; background: var(--lime); color: #0f0f0f; font-family: inherit; font-weight: 700; font-size: 14px; cursor: pointer; transition: transform .16s, filter .16s; }
+.nx-login:hover { transform: translateY(-1px); filter: brightness(1.04); }
+.nx-login:disabled { opacity: .7; cursor: default; }
+
+.nx-hero { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: clamp(14px, 2.5vh, 26px); padding: clamp(16px, 3vh, 30px) 20px; }
+.nx-title { margin: 0; color: var(--cream); font-weight: 800; font-size: clamp(56px, 11vw, 150px); line-height: .9; letter-spacing: -.045em; }
+.nx-sub { margin: 0; color: var(--grey); font-size: 15px; font-weight: 500; line-height: 1.5; }
+
+.nx-tiles { display: grid; grid-template-columns: repeat(5, clamp(96px, 11vw, 150px)); justify-content: center; gap: clamp(14px, 1.6vw, 22px); padding: 0 20px clamp(24px, 4vh, 44px); }
+.nx-tile { position: relative; aspect-ratio: 1 / 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+  border: 0; color: #131313; font-family: inherit; transition: transform .2s; }
+.nx-tile:hover { transform: translateY(-6px); }
+.nx-tile span { position: absolute; top: 20px; left: 24px; font-size: 14px; font-weight: 700; letter-spacing: -.01em; }
+.nx-tile.shape-circle { border-radius: 50%; }
+.nx-tile.shape-square { border-radius: 34px; }
+.nx-tile.shape-pentagon { border-radius: 34px 0 0 34px; clip-path: polygon(0 0, 80% 0, 100% 50%, 80% 100%, 0 100%); }
+.nx-tile.tint-violet { background: var(--violet); }
+.nx-tile.tint-green { background: var(--green); }
+.nx-tile.tint-orange { background: var(--orange); }
+.nx-tile.tint-yellow { background: var(--yellow); }
+.nx-tile.tint-blue { background: var(--blue); }
+
+/* 별도 로그인 화면(랜딩의 Login 버튼을 누르면 전환) */
+.nx-auth { display: grid; place-items: center; min-height: 100vh; padding: 24px; }
+.nx-card { width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: 14px;
+  background: #161616; border: 1px solid #2c2c2c; border-radius: 20px; padding: 32px 28px; position: relative; }
+.nx-card-back { position: absolute; top: 18px; left: 18px; display: inline-flex; align-items: center; gap: 4px;
+  background: none; border: none; color: #9a9a9a; font-size: 13px; cursor: pointer; }
+.nx-card-back:hover { color: #ddd; }
+.nx-card .nx-logo { margin: 8px 0 4px; }
+.nx-card-title { margin: 0; font-size: 26px; font-weight: 800; color: #fff; }
+.nx-card-sub { margin: 0 0 8px; color: #9a9a9a; font-size: 14px; }
+.nx-card label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; color: #cfcfcf; }
+.nx-card input { padding: 12px 14px; border-radius: 12px; border: 1px solid #3a3a3a; background: #1c1c1c; color: #fff; font-size: 15px; }
+.nx-card input:focus { outline: none; border-color: #8ab4ff; }
+.nx-login.full { width: 100%; margin-top: 6px; cursor: pointer; }
+.nx-form-error { margin: 0; color: #ff8a7a; font-size: 13px; }
+
+@media (max-width: 720px) {
+  .nx-nav { flex-wrap: wrap; }
+  .nx-nav-bar { gap: 14px; padding: 0 14px 0 5px; overflow-x: auto; }
+  .nx-nav-bar a { font-size: 12px; }
+  .nx-tiles { gap: 8px; margin-bottom: -18px; }
+  .nx-tile { height: 88px; gap: 0; }
+  .nx-tile.shape-square { border-radius: 22px; }
+  .nx-tile span { display: none; }
+  .nx-tile svg { width: 34px; height: 34px; }
+}
