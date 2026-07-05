@@ -17,7 +17,7 @@ export default function Sidebar({ user, onLogout, open, setOpen, onSearch }) {
         </NavLink>
         <button className="oa-icon mobile-only" onClick={close} aria-label="메뉴 닫기"><X size={18} /></button>
       </div>
-      <button className="oa-search" onClick={onSearch}><Search size={16} /><span>검색</span><kbd>Ctrl K</kbd></button>
+      <button className="oa-search" onClick={onSearch} aria-label="검색 열기"><Search size={16} /><span>검색</span><kbd>Ctrl K</kbd></button>
       <nav className="oa-nav">
         {NAV_ITEMS.map(({ id, label, icon: Icon, path }) => (
           <NavLink key={id} to={path} end={path === '/'} className={navClass} onClick={close}><Icon size={18} strokeWidth={1.9} /><span>{label}</span></NavLink>
@@ -35,7 +35,7 @@ export default function Sidebar({ user, onLogout, open, setOpen, onSearch }) {
           <p>다크 대시보드로 일정과 업무를 한눈에 확인하세요.</p>
           <NavLink to="/" className="oa-promo-btn" onClick={close}>자세히</NavLink>
         </div>
-        <button className="oa-org" onClick={onLogout} title="로그아웃">
+        <button className="oa-org" onClick={onLogout} aria-label="로그아웃">
           <span className="oa-org-mark">{user.name.slice(0, 1)}</span>
           <span className="oa-org-info"><strong>{user.name}</strong><small>개인 워크스페이스</small></span>
           <LogOut size={16} />

@@ -40,7 +40,7 @@ export default function DashboardPage() {
           <div className="oa-days">
             {CALENDAR_DATES.map((date, index) => {
               const event = calendarEvents.find((item) => item.date === date && (!!item.nextMonth === (index > 1)))
-              return <button key={`${date}-${index}`} className={`oa-day ${index === 1 ? 'today' : ''} ${index === 0 || index > 31 ? 'muted' : ''}`}><span>{date}</span>{event && <small className={event.tone}>{event.label}</small>}</button>
+              return <div key={`${date}-${index}`} className={`oa-day ${index === 1 ? 'today' : ''} ${index === 0 || index > 31 ? 'muted' : ''}`}><span>{date}</span>{event && <small className={event.tone}>{event.label}</small>}</div>
             })}
           </div>
         </section>
@@ -51,7 +51,7 @@ export default function DashboardPage() {
             <div className="oa-todos">
               {todos.map((todo) => (
                 <div key={todo.id} className={`oa-todo ${todo.done ? 'done' : ''}`}>
-                  <button className="oa-check" onClick={() => toggleTodo(todo.id)}>{todo.done && <Check size={13} />}</button>
+                  <button className="oa-check" onClick={() => toggleTodo(todo.id)} aria-pressed={todo.done} aria-label={todo.done ? `${todo.title} 완료 취소` : `${todo.title} 완료로 표시`}>{todo.done && <Check size={13} />}</button>
                   <div><strong>{todo.title}</strong><span>{todo.project}</span></div>
                   <small className={todo.priority}>{todo.due}</small>
                 </div>

@@ -10,4 +10,9 @@ export default defineConfig({
     // 백엔드가 붙으면 여기에 /api 프록시를 추가한다.
   },
   preview: { host: '127.0.0.1', port: 5173, strictPort: true },
+  test: {
+    environment: 'jsdom',
+    setupFiles: ['./src/test/setup.js'],
+    globals: true,
+  },
 })

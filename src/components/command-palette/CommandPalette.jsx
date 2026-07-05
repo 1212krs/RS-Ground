@@ -12,8 +12,8 @@ export default function CommandPalette({ open, onClose }) {
 
   return (
     <div className="command-backdrop" onMouseDown={onClose}>
-      <div className="command-palette" onMouseDown={(e) => e.stopPropagation()}>
-        <label><Search size={19} /><input autoFocus value={query} onChange={(e) => setQuery(e.target.value)} placeholder="페이지 또는 기능 검색…" /><kbd>ESC</kbd></label>
+      <div className="command-palette" role="dialog" aria-modal="true" aria-label="명령 팔레트" onMouseDown={(e) => e.stopPropagation()}>
+        <label><Search size={19} /><input autoFocus aria-label="페이지 또는 기능 검색" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="페이지 또는 기능 검색…" /><kbd>ESC</kbd></label>
         <div>
           {items.map(({ id, label, icon: Icon, path }) => (
             <button key={id} onClick={() => { navigate(path); onClose() }}><Icon size={18} /><span>{label}</span><ArrowRight size={15} /></button>
