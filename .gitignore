@@ -2,3 +2,11 @@ node_modules
 dist
 .DS_Store
 *.local
+
+# RAG 파이프라인 (backend/rag) — PRD-RAG.md 참고
+backend/venv
+.env
+data/
+output/
+__pycache__/
+*.pyc

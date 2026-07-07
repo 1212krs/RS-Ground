@@ -1,0 +1,36 @@
+/* ---- 지식 탭 (OpenAI-style dark, 홈 대시보드와 동일한 다크 배경 컨벤션) ---- */
+.kb { --violet: #8B7EE8; --green: #1FA25A; --orange: #F2542D; --yellow: #F2B705; --blue: #3B82F6; --red: #EF4444;
+  height: 100vh; overflow: hidden; display: flex; flex-direction: column; background: #0d0d0d; color: #ededed;
+  padding: 22px clamp(20px, 3vw, 40px) 24px; }
+.kb-head { flex: 0 0 auto; display: flex; align-items: center; gap: 16px; margin-bottom: 18px; }
+.kb-head h1 { margin: 0; font-size: 28px; font-weight: 600; letter-spacing: -.02em; }
+
+.kb-card { background: #161616; border: 1px solid #242424; border-radius: 14px; padding: 20px 22px; margin-bottom: 14px; }
+.kb-card h2 { margin: 0 0 6px; font-size: 15px; font-weight: 600; }
+.kb-hint { margin: 0 0 16px; color: #8a8a8a; font-size: 12.5px; line-height: 1.6; }
+
+.kb-category-row { display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+.kb-category-row input { flex: 1; min-width: 140px; padding: 10px 12px; border-radius: 9px; border: 1px solid #2a2a2a; background: #121212; color: #ededed; font-size: 13px; }
+.kb-category-row input:focus { outline: none; border-color: var(--violet); }
+
+.kb-upload-btn { display: inline-flex; align-items: center; gap: 8px; border: 0; border-radius: 10px; background: #AEE63E; color: #0f0f0f; padding: 11px 18px; font-size: 13px; font-weight: 700; cursor: pointer; transition: transform .16s, filter .16s; }
+.kb-upload-btn:hover:not(:disabled) { transform: translateY(-1px); filter: brightness(1.04); }
+.kb-upload-btn:disabled { opacity: .6; cursor: default; }
+
+.kb-list { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+.kb-empty { color: #6e6e6e; font-size: 13px; margin: 8px 0; }
+.kb-doc-list { list-style: none; margin: 8px 0 0; padding: 0; overflow-y: auto; flex: 1; min-height: 0; }
+.kb-doc { display: flex; align-items: center; gap: 12px; padding: 12px 8px; border-top: 1px solid #202020; }
+.kb-doc:first-child { border-top: 0; }
+.kb-doc > svg { color: #7a7a7a; flex: 0 0 auto; }
+.kb-doc-info { flex: 1; min-width: 0; display: grid; gap: 5px; }
+.kb-doc-info strong { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kb-badges { display: flex; gap: 6px; flex-wrap: wrap; }
+.kb-badge { padding: 2px 8px; border-radius: 999px; font-size: 10.5px; font-weight: 600; background: rgba(59,130,246,.18); color: var(--blue); }
+.kb-badge.success { background: rgba(31,162,90,.18); color: var(--green); }
+.kb-chunk-count { flex: 0 0 auto; color: #7a7a7a; font-size: 11.5px; }
+
+@media (max-width: 760px) {
+  .kb { height: auto; min-height: 100vh; overflow: visible; padding: 18px 16px 40px; }
+  .kb-head h1 { font-size: 24px; }
+}

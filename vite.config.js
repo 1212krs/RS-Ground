@@ -62,6 +62,10 @@ export default defineConfig({
   server: {
     host: '127.0.0.1', port: 5173, strictPort: true,
     // 진짜 백엔드가 붙으면 mockAuth()를 지우고 여기에 /api 프록시를 추가한다.
+    proxy: {
+      // RAG API (backend/rag/api.py, uvicorn으로 별도 실행 필요). PRD-RAG.md 참고.
+      '/api/rag': { target: 'http://127.0.0.1:8000', changeOrigin: true },
+    },
   },
   preview: { host: '127.0.0.1', port: 5173, strictPort: true },
   test: {
