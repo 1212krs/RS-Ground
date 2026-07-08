@@ -64,7 +64,7 @@ src/
   main.jsx                        React 진입점. ErrorBoundary → BrowserRouter → AuthProvider → App 순서로 감쌈
   App.jsx                         라우트 정의 (React.lazy + Suspense로 페이지별 지연 로딩)
   api.js / utils.js / data.js     서버 요청 함수 / 공용 유틸(uid) / 데모 데이터(할 일·일정)
-  ragApi.js                       RAG API(backend/rag/api.py) 요청 함수 — /api/rag/documents 업로드·목록 조회
+  ragApi.js                       RAG API(backend/rag/api.py) 요청 함수 — /api/rag/documents 업로드·목록 조회 + chat()(/api/rag/chat 질의응답)
   reportApi.js                    보고서 API(backend/report/api.py) 요청 함수 — 서식 목록/AI 생성/hwpx 다운로드
   context/
     AuthContext.jsx               로그인 상태(user/loading) 전역 관리, 새로고침 시 /api/auth/me로 세션 확인
@@ -79,8 +79,11 @@ src/
   pages/
     login/LoginPage.jsx            랜딩 히어로 + 로그인 폼 (내부 state로 전환, 별도 라우트 아님)
     dashboard/DashboardPage.jsx    홈(캘린더/할 일/메모) — 실제 완성된 보호 페이지
-    knowledge/KnowledgePage.jsx    지식 탭 — 문서 업로드(.txt/.md/.pdf/.docx/.hwpx) + 임베딩 색인 + 색인된 문서 목록 (2026-07-07 추가, RAG API 서버 연동)
+    knowledge/KnowledgePage.jsx    지식 탭 — 문서 업로드(.txt/.md/.pdf/.docx/.hwpx) + 임베딩 색인 + 색인된 문서 목록 + [목록/지도] 토글(EmbeddingMap.jsx, UMAP 산점도) (2026-07-07 추가, 지도 2026-07-08 추가)
+    knowledge/EmbeddingMap.jsx     임베딩 지도 — UMAP 2D 좌표를 순수 SVG 산점도로(외부 차트 라이브러리 없음). 색=출처 파일, 범례 토글, 점 hover 미리보기 (2026-07-08 추가)
     reports/ReportsPage.jsx        보고서 탭 — 서식 선택 → 제목·내용·참고파일로 AI 본문 생성 → 섹션 편집·미리보기 → hwpx 다운로드 (2026-07-08 추가)
+    chat/ChatPage.jsx              AI 채팅/회계챗 — 근거 기반 질의응답 (2026-07-08 추가). URL 파라미터 ?scope=회계 로 검색 분야를 걸어 회계챗/AI챗을 겸함(전체=필터 없음).
+    agents/AgentsPage.jsx          에이전트 허브 — 분야별 전용 챗 카드(회계챗 등). agentsConfig.js가 에이전트 목록(=데이터). 카드 클릭 시 /chat?scope=... 로 이동 (2026-07-08 추가).
     coming-soon/ComingSoonPage.jsx 미완성 사이드바 항목용 공용 자리표시자
     not-found/NotFoundPage.jsx     알 수 없는 주소(`*`) 처리
   hooks/useStoredState.js          localStorage 동기화 state 훅
@@ -88,7 +91,9 @@ src/
 vite.config.js                    react() + mockAuth()(dev 전용 가짜 인증) + /api/rag 프록시(→127.0.0.1:8000) + vitest 설정
 backend/
   main.py                         통합 진입점 — rag 앱에 보고서 라우터를 합쳐 한 서버로 띄움 (2026-07-08 추가). 실행 명령은 3장 참고.
-  rag/api.py                      RAG용 FastAPI 서버. POST/GET /api/rag/documents (업로드 시 전체 재색인).
+  rag/api.py                      RAG용 FastAPI 서버. POST/GET /api/rag/documents (업로드 시 전체 재색인), POST /api/rag/chat (근거 기반 질의응답), GET/POST /api/rag/umap (임베딩 지도 좌표 조회/재계산).
+  rag/chat.py                     질의응답 엔진 (2026-07-08 추가) — 질문 임베딩→store.query(카테고리 필터)→Claude(claude-sonnet-5, urllib) 근거 기반 답변. 키 없으면 근거만 반환(fallback).
+  rag/visualize.py                UMAP 2D 축소 + 좌표 저장/로드(umap_coords.json) + Plotly HTML. api.py의 POST /api/rag/umap이 여기 함수를 지연 import해 씀(umap-learn이 무거워 서버 시작을 늦추지 않도록).
   report/                         보고서 생성 패키지 (2026-07-08 추가) — engine.py(hwpx 마커 치환·조립, 표준 라이브러리만),
                                   composer.py(Claude API urllib 직접 호출 + 대체 생성기 + 지침 3계층),
                                   extractors.py(참고파일 텍스트 추출 — txt/md/csv/hwp/hwpx/docx, .hwp OLE 파서 자체 구현),
@@ -96,8 +101,8 @@ backend/
                                   templates/(서식 hwpx + 지침 md 세트 — "서식이름.hwpx"+"서식이름.md" 쌍, "_공통지침.md"는 전체 공통)
 ```
 
-- **라우트 구성**(`App.jsx`): `/login`(공개) · `/`(보호, `DashboardPage`) · `/knowledge`(보호, `KnowledgePage`) · `/reports`(보호, `ReportsPage`) · `PENDING_NAV`에 나열된 경로(`/chat`, `/agents`, `/calendar`, `/todos`, `/memos`, `/settings`, 전부 보호)는 `ComingSoonPage`로 연결 · `*`는 `NotFoundPage`.
-- **다크 배경 페이지**: `AppLayout.jsx`의 `NO_TOPBAR_PATHS`(`/`, `/agents`, `/knowledge`, `/reports`)에 경로를 넣으면 상단바가 사라지고 `.main-area.main-dark`(검정 배경)가 적용된다. 각 페이지는 `.oa`(대시보드)/`.kb`(지식)/`.rp`(보고서) 처럼 자기 스코프에 다크 팔레트 CSS 변수를 정의하는 컨벤션(로그인 페이지의 `.nx`와 동일 패턴).
+- **라우트 구성**(`App.jsx`): `/login`(공개) · `/`(보호, `DashboardPage`) · `/knowledge`(보호, `KnowledgePage`) · `/reports`(보호, `ReportsPage`) · `/chat`(보호, `ChatPage`) · `/agents`(보호, `AgentsPage`) · `PENDING_NAV`에 나열된 경로(`/calendar`, `/todos`, `/memos`, `/settings`, 전부 보호)는 `ComingSoonPage`로 연결 · `*`는 `NotFoundPage`.
+- **다크 배경 페이지**: `AppLayout.jsx`의 `NO_TOPBAR_PATHS`(`/`, `/agents`, `/knowledge`, `/reports`, `/chat`)에 경로를 넣으면 상단바가 사라지고 `.main-area.main-dark`(검정 배경)가 적용된다. 각 페이지는 `.oa`(대시보드)/`.kb`(지식)/`.rp`(보고서)/`.ai`(채팅)/`.ag`(에이전트) 처럼 자기 스코프에 다크 팔레트 CSS 변수를 정의하는 컨벤션(로그인 페이지의 `.nx`와 동일 패턴).
 - **새 화면을 추가하는 규칙**: ① `layouts/navConfig.js`의 해당 항목을 `PENDING_NAV` 대상에서 뺀다 ② `pages/새화면/` 폴더에 실제 컴포넌트+css 작성 ③ `App.jsx`의 `PENDING_NAV.map(...)` 줄 위/아래에 전용 `<Route>`를 추가하고 `lazy(() => import(...))`로 불러온다.
 
 ---
@@ -122,7 +127,8 @@ backend/
 ## 6. 중요한 한계 / 미구현 (사실 기반)
 
 - **인증용 진짜 백엔드는 여전히 없다.** DB, 실제 인증 미구현. `vite.config.js`의 `mockAuth()`는 비밀번호를 검사하지 않는 개발용 임시 장치이며 실제 보안이 아니다. (RAG용 FastAPI 서버(`backend/rag/api.py`)는 별개로 실제 동작함 — 7장 참고. 이 서버엔 인증이 전혀 없어서 로컬 개발 전용이고, 외부에 노출하면 안 됨.)
-- AI 채팅/보고서/에이전트/일정/할 일(전체 화면)/메모(전체 화면)/설정 — 전부 `ComingSoonPage` 자리표시자만 있고 실제 화면 없음. (지식 탭은 2026-07-07부터 실제 동작함.)
+- 일정/할 일(전체 화면)/메모(전체 화면)/설정 — 아직 `ComingSoonPage` 자리표시자만 있고 실제 화면 없음. (지식 탭 2026-07-07, 보고서·AI채팅·에이전트 탭 2026-07-08부터 실제 동작함.)
+- AI 채팅/에이전트(회계챗)는 지식 탭에 올린 문서를 근거로만 답한다. 답변 생성엔 `ANTHROPIC_API_KEY` 필요(없으면 근거 조각만 보여주는 fallback). 대화 기록은 저장되지 않음(새로고침 시 초기화), 답변 마크다운은 아직 서식 렌더링 없이 줄바꿈만 보존.
 - 문서 업로드는 `.txt`/`.md`/`.pdf`/`.docx`/`.hwpx` 가능(2026-07-07 확장). XLSX, 옛 바이너리 `.hwp`(구버전, hwpx 아님), 이미지 기반 스캔 PDF(OCR 필요)는 아직 미지원.
 - 접근성 점검은 자동 검사 수준(아이콘 버튼 `aria-label`)만 했고, 스크린리더 수동 청취·전체 키보드 탭 순서 감사는 하지 않음.
 - 테스트는 스모크 테스트 3개뿐. 컴포넌트 단위 테스트, 대시보드 상호작용(할 일 토글, 메모 저장) 테스트는 없음.
