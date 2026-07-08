@@ -10,13 +10,15 @@ const LoginPage = lazy(() => import('./pages/login/LoginPage.jsx'))
 const DashboardPage = lazy(() => import('./pages/dashboard/DashboardPage.jsx'))
 const KnowledgePage = lazy(() => import('./pages/knowledge/KnowledgePage.jsx'))
 const ReportsPage = lazy(() => import('./pages/reports/ReportsPage.jsx'))
+const ChatPage = lazy(() => import('./pages/chat/ChatPage.jsx'))
+const AgentsPage = lazy(() => import('./pages/agents/AgentsPage.jsx'))
 const ComingSoonPage = lazy(() => import('./pages/coming-soon/ComingSoonPage.jsx'))
 const NotFoundPage = lazy(() => import('./pages/not-found/NotFoundPage.jsx'))
 
 // 아직 페이지를 만들지 않은 사이드바 항목들. 완성되는 대로 이 배열에서 빼고
 // 실제 페이지 컴포넌트를 <Route>에 연결하면 된다.
 const PENDING_NAV = [
-  ...NAV_ITEMS.filter((item) => !['home', 'knowledge', 'reports'].includes(item.id)),
+  ...NAV_ITEMS.filter((item) => !['home', 'knowledge', 'reports', 'chat', 'agents'].includes(item.id)),
   ...PRODUCTIVITY_ITEMS,
   SETTINGS_ITEM,
 ]
@@ -30,6 +32,8 @@ function App() {
           <Route index element={<DashboardPage />} />
           <Route path="knowledge" element={<KnowledgePage />} />
           <Route path="reports" element={<ReportsPage />} />
+          <Route path="chat" element={<ChatPage />} />
+          <Route path="agents" element={<AgentsPage />} />
           {PENDING_NAV.map(({ id, path, label }) => (
             <Route key={id} path={path.slice(1)} element={<ComingSoonPage label={label} />} />
           ))}

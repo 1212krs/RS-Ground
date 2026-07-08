@@ -1,0 +1,29 @@
+/* ---- 에이전트 허브 (다크, 지식·채팅 탭과 동일 컨벤션) ---- */
+.ag { height: 100vh; overflow-y: auto; background: #0d0d0d; color: #ededed;
+  padding: 22px clamp(20px, 3vw, 40px) 40px; }
+
+.ag-head { display: flex; align-items: center; gap: 16px; margin-bottom: 22px; }
+.ag-head h1 { margin: 0; font-size: 26px; font-weight: 600; letter-spacing: -.02em; }
+.ag-sub { margin: 4px 0 0; color: #8a8a8a; font-size: 12.5px; max-width: 620px; line-height: 1.6; }
+
+.ag-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; }
+
+.ag-card { text-align: left; background: #161616; border: 1px solid #242424; border-radius: 14px;
+  padding: 18px; display: flex; flex-direction: column; gap: 8px; cursor: pointer; position: relative;
+  color: inherit; font: inherit; transition: transform .16s, border-color .16s; }
+.ag-card:hover { transform: translateY(-2px); border-color: #3a3a3a; }
+.ag-icon { width: 44px; height: 44px; border-radius: 11px; display: grid; place-items: center;
+  background: #202020; color: #9a9a9a; margin-bottom: 4px; }
+.ag-card strong { font-size: 15px; font-weight: 600; }
+.ag-desc { font-size: 12.5px; color: #8a8a8a; line-height: 1.55; flex: 1; }
+.ag-open { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--accent, #AEE63E); margin-top: 4px; }
+
+.ag-card-soon { cursor: default; opacity: .6; }
+.ag-card-soon:hover { transform: none; border-color: #242424; }
+.ag-soon-badge { position: absolute; top: 14px; right: 14px; font-size: 10.5px; font-weight: 700;
+  color: #8a8a8a; background: #202020; border-radius: 999px; padding: 3px 9px; }
+
+@media (max-width: 760px) {
+  .ag { padding: 18px 16px 40px; }
+  .ag-head h1 { font-size: 22px; }
+}

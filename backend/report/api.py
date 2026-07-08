@@ -13,6 +13,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from urllib.parse import quote
 
 from dotenv import load_dotenv
@@ -23,7 +24,9 @@ from .composer import ai_status, compose
 from .engine import build_hwpx, form_to_doc, get_template, list_templates
 from .extractors import extract_file_text
 
-load_dotenv()  # backend/.env 의 ANTHROPIC_API_KEY 로드
+# 실행 위치(cwd)에 상관없이 backend/.env 를 확실히 읽도록 경로를 고정한다.
+# (이 파일은 backend/report/api.py 이므로 parents[1] == backend/)
+load_dotenv(Path(__file__).resolve().parents[1] / ".env")  # ANTHROPIC_API_KEY 로드
 
 router = APIRouter(prefix="/api/report")
 

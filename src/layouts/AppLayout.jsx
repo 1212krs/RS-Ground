@@ -9,7 +9,7 @@ import { PAGE_META } from './navConfig.js'
 import './AppLayout.css'
 
 // 홈처럼 자체 다크 배경·헤더를 쓰는 화면은 상단 Topbar를 숨긴다.
-const NO_TOPBAR_PATHS = ['/', '/agents', '/knowledge', '/reports']
+const NO_TOPBAR_PATHS = ['/', '/agents', '/knowledge', '/reports', '/chat']
 
 export default function AppLayout() {
   const { user, logout } = useAuth()

@@ -1,0 +1,68 @@
+/* ---- AI 채팅 / 회계챗 (다크, 지식·보고서 탭과 동일 컨벤션) ---- */
+.ai { --violet: #8B7EE8; --green: #1FA25A; --accent: #AEE63E;
+  height: 100vh; overflow: hidden; display: flex; flex-direction: column;
+  background: #0d0d0d; color: #ededed; padding: 22px clamp(16px, 3vw, 40px) 18px; }
+
+.ai-head { flex: 0 0 auto; display: flex; align-items: center; gap: 16px; margin-bottom: 14px; }
+.ai-head h1 { margin: 0; font-size: 26px; font-weight: 600; letter-spacing: -.02em; }
+.ai-sub { margin: 3px 0 0; color: #8a8a8a; font-size: 12.5px; }
+
+/* 대화 영역 */
+.ai-thread { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 14px;
+  max-width: 860px; width: 100%; margin: 0 auto; padding: 6px 2px 10px; }
+
+.ai-empty { margin: auto; text-align: center; color: #7a7a7a; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.ai-empty > svg { color: var(--accent); }
+.ai-empty p { margin: 0; font-size: 14px; }
+.ai-suggest { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 6px; }
+.ai-suggest button { background: #161616; border: 1px solid #262626; color: #cfcfcf; border-radius: 999px;
+  padding: 8px 14px; font-size: 12.5px; cursor: pointer; transition: border-color .16s, color .16s; }
+.ai-suggest button:hover { border-color: var(--accent); color: #fff; }
+
+.ai-msg { display: flex; }
+.ai-msg-user { justify-content: flex-end; }
+.ai-msg-assistant { justify-content: flex-start; }
+
+.ai-bubble { max-width: 88%; border-radius: 14px; padding: 12px 15px; font-size: 14px; line-height: 1.62; }
+.ai-msg-user .ai-bubble { background: #2b2f24; border: 1px solid #3a4030; color: #f2f6ea; border-bottom-right-radius: 5px; }
+.ai-msg-assistant .ai-bubble { background: #161616; border: 1px solid #242424; border-bottom-left-radius: 5px; }
+.ai-text { white-space: pre-wrap; word-break: break-word; }
+
+/* 근거 */
+.ai-sources { margin-top: 10px; border-top: 1px solid #242424; padding-top: 8px; }
+.ai-sources summary { cursor: pointer; font-size: 12px; color: var(--violet); font-weight: 600; list-style: none; }
+.ai-sources summary::-webkit-details-marker { display: none; }
+.ai-sources summary::before { content: '▸ '; }
+.ai-sources[open] summary::before { content: '▾ '; }
+.ai-sources ul { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.ai-sources li { display: grid; grid-template-columns: auto 1fr; gap: 4px 7px; align-items: start;
+  background: #111; border: 1px solid #202020; border-radius: 9px; padding: 8px 10px; }
+.ai-sources li > svg { color: #7a7a7a; margin-top: 2px; }
+.ai-src-name { font-size: 11.5px; color: #c9c9c9; font-weight: 600; }
+.ai-src-preview { grid-column: 2; font-size: 11.5px; color: #8a8a8a; line-height: 1.5;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+
+/* 타이핑 표시 */
+.ai-typing { display: inline-flex; gap: 4px; }
+.ai-typing span { width: 7px; height: 7px; border-radius: 50%; background: #6a6a6a; animation: ai-blink 1.2s infinite both; }
+.ai-typing span:nth-child(2) { animation-delay: .2s; }
+.ai-typing span:nth-child(3) { animation-delay: .4s; }
+@keyframes ai-blink { 0%, 80%, 100% { opacity: .3; } 40% { opacity: 1; } }
+
+/* 입력 바 */
+.ai-inputbar { flex: 0 0 auto; max-width: 860px; width: 100%; margin: 8px auto 0;
+  display: flex; align-items: flex-end; gap: 10px; background: #161616; border: 1px solid #2a2a2a;
+  border-radius: 14px; padding: 10px 10px 10px 14px; }
+.ai-inputbar textarea { flex: 1; resize: none; max-height: 160px; border: 0; background: transparent;
+  color: #ededed; font-size: 14px; line-height: 1.5; font-family: inherit; padding: 6px 0; }
+.ai-inputbar textarea:focus { outline: none; }
+.ai-send { flex: 0 0 auto; border: 0; border-radius: 10px; background: var(--accent); color: #0f0f0f;
+  width: 40px; height: 40px; display: grid; place-items: center; cursor: pointer; transition: filter .16s, transform .16s; }
+.ai-send:hover:not(:disabled) { filter: brightness(1.05); transform: translateY(-1px); }
+.ai-send:disabled { opacity: .4; cursor: default; }
+
+@media (max-width: 760px) {
+  .ai { padding: 16px 12px 12px; height: 100dvh; }
+  .ai-head h1 { font-size: 22px; }
+  .ai-bubble { max-width: 94%; }
+}
