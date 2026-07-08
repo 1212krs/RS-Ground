@@ -65,6 +65,8 @@ export default defineConfig({
     proxy: {
       // RAG API (backend/rag/api.py, uvicorn으로 별도 실행 필요). PRD-RAG.md 참고.
       '/api/rag': { target: 'http://127.0.0.1:8000', changeOrigin: true },
+      // 보고서 API (backend/report/api.py). RAG와 같은 서버(main:app)에서 함께 뜬다.
+      '/api/report': { target: 'http://127.0.0.1:8000', changeOrigin: true },
     },
   },
   preview: { host: '127.0.0.1', port: 5173, strictPort: true },
