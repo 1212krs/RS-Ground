@@ -1,5 +1,5 @@
 import { useNavigate, useOutletContext } from 'react-router-dom'
-import { Menu, MessageSquareText, Globe } from 'lucide-react'
+import { Menu, MessageSquareText } from 'lucide-react'
 import { AGENTS, UPCOMING_AGENTS } from './agentsConfig.js'
 import './AgentsPage.css'
 
@@ -23,16 +23,7 @@ export default function AgentsPage() {
       </header>
 
       <div className="ag-grid">
-        {/* 전체 검색(AI챗)도 하나의 카드로 노출 */}
-        <button className="ag-card" onClick={() => navigate('/chat')}>
-          <span className="ag-icon" style={{ background: 'rgba(139,126,232,.16)', color: '#8B7EE8' }}>
-            <Globe size={22} />
-          </span>
-          <strong>AI 채팅 (전체)</strong>
-          <span className="ag-desc">모든 문서에서 검색해 답합니다.</span>
-          <span className="ag-open"><MessageSquareText size={13} /> 대화 시작</span>
-        </button>
-
+        {/* 전체 검색은 상단 'AI 채팅' 탭에서 제공하므로 여기서는 분야별 에이전트만 노출한다. */}
         {AGENTS.map((a) => {
           const Icon = a.icon
           return (
