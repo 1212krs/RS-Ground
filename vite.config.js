@@ -67,6 +67,8 @@ export default defineConfig({
       '/api/rag': { target: 'http://127.0.0.1:8000', changeOrigin: true },
       // 보고서 API (backend/report/api.py). RAG와 같은 서버(main:app)에서 함께 뜬다.
       '/api/report': { target: 'http://127.0.0.1:8000', changeOrigin: true },
+      // 워크스페이스 저장 API (backend/store/api.py). 일정·할 일·메모 영속 저장.
+      '/api/store': { target: 'http://127.0.0.1:8000', changeOrigin: true },
     },
   },
   preview: { host: '127.0.0.1', port: 5173, strictPort: true },

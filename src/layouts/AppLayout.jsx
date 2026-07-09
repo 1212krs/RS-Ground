@@ -9,7 +9,8 @@ import { PAGE_META } from './navConfig.js'
 import './AppLayout.css'
 
 // 홈처럼 자체 다크 배경·헤더를 쓰는 화면은 상단 Topbar를 숨긴다.
-const NO_TOPBAR_PATHS = ['/', '/agents', '/knowledge', '/reports', '/chat']
+// 홈 워크스페이스(/, /calendar, /todos, /memos)는 자체 탭 헤더를 가진다.
+const NO_TOPBAR_PATHS = ['/', '/calendar', '/todos', '/memos', '/agents', '/knowledge', '/reports', '/chat']
 
 export default function AppLayout() {
   const { user, logout } = useAuth()

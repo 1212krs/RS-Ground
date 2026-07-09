@@ -1,0 +1,177 @@
+/* ===== 홈 생산성 워크스페이스 (일정 · 할 일 · 메모 전체화면 전환) =====
+   기존 대시보드의 다크 테마(#0d0d0d 배경, #161616 카드)를 계승한다. */
+
+.ws { height: 100vh; overflow: hidden; display: flex; flex-direction: column; background: #0d0d0d; color: #ededed; }
+
+/* ---- 상단 탭 ---- */
+.ws-head { flex: 0 0 auto; display: flex; align-items: center; gap: 14px; padding: 16px clamp(18px, 3vw, 36px) 0; }
+.ws-menu { display: grid; place-items: center; width: 38px; height: 38px; border: 1px solid #262626; border-radius: 9px; background: transparent; color: #ededed; cursor: pointer; }
+.ws-tabs { display: inline-flex; gap: 4px; padding: 4px; background: #161616; border: 1px solid #242424; border-radius: 12px; }
+.ws-tab { display: inline-flex; align-items: center; gap: 7px; padding: 8px 16px; border: 0; border-radius: 9px; background: transparent; color: #9a9a9a; font-size: 13.5px; font-weight: 600; cursor: pointer; transition: background .15s, color .15s; }
+.ws-tab:hover { color: #ededed; }
+.ws-tab.active { background: #2a2a2a; color: #fff; }
+
+/* ---- 슬라이드 전환 뷰포트 ---- */
+.ws-viewport { flex: 1; min-height: 0; overflow: hidden; }
+.ws-track { display: flex; height: 100%; transition: transform .28s ease; }
+.ws-slide { flex: 0 0 100%; width: 100%; height: 100%; overflow: hidden; }
+
+/* =========================== 일정 패널 =========================== */
+.cal { display: flex; height: 100%; }
+.cal-main { flex: 1; min-width: 0; display: flex; flex-direction: column; padding: 18px clamp(18px, 3vw, 36px) 22px; }
+
+.cal-toolbar { flex: 0 0 auto; display: flex; align-items: center; justify-content: center; position: relative; margin-bottom: 14px; }
+.cal-today { position: absolute; left: 0; border: 1px solid #2a2a2a; border-radius: 8px; background: transparent; color: #c4c4c4; padding: 7px 14px; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+.cal-today:hover { background: #1c1c1c; color: #fff; }
+.cal-nav { display: flex; align-items: center; gap: 14px; }
+.cal-nav button { display: grid; place-items: center; width: 30px; height: 30px; border: 1px solid #2a2a2a; border-radius: 8px; background: transparent; color: #b4b4b4; cursor: pointer; }
+.cal-nav button:hover { background: #202020; }
+.cal-nav strong { font-size: 16px; min-width: 120px; text-align: center; letter-spacing: -.01em; }
+
+.cal-weekrow { flex: 0 0 auto; display: grid; grid-template-columns: repeat(7, 1fr); margin-bottom: 6px; }
+.cal-weekrow span { text-align: center; color: #6e6e6e; font-size: 11.5px; font-weight: 600; padding: 6px 0; }
+.cal-weekrow span:first-child { color: #d47b7b; }
+.cal-weekrow span:last-child { color: #7b9dd4; }
+
+.cal-grid { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(7, 1fr); grid-template-rows: repeat(6, minmax(0, 1fr)); gap: 6px; }
+.cal-cell { display: flex; flex-direction: column; min-height: 0; overflow: hidden; border: 1px solid #202020; border-radius: 9px; background: #121212; padding: 6px 7px; text-align: left; cursor: pointer; transition: background .13s, border-color .13s; }
+.cal-cell:hover { background: #1a1a1a; }
+.cal-cell.muted { background: #0f0f0f; }
+.cal-cell.muted .cal-cell-day { color: #4c4c4c; }
+.cal-cell.today { border-color: #3a3a3a; }
+.cal-cell.selected { border-color: #5a7fd6; background: #16191f; }
+.cal-cell-day { flex: 0 0 auto; font-size: 12.5px; color: #c4c4c4; }
+.cal-cell.today .cal-cell-day { align-self: flex-start; display: grid; place-items: center; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 10px; background: #fff; color: #0d0d0d; font-weight: 700; }
+.cal-cell-events { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 3px; margin-top: 5px; overflow: hidden; }
+/* 일정 텍스트는 배경 없이 글자색만으로 구분한다(더 가볍고 큰 글씨). */
+.cal-chip { display: block; padding: 0 2px; font-size: 12.5px; font-weight: 500; line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #7cb0f7; }
+.cal-chip em { font-style: normal; opacity: .75; margin-right: 4px; }
+.cal-chip.coral { color: #f2a184; }
+.cal-chip.violet { color: #b6a8fb; }
+.cal-chip.lime { color: #7de08d; }
+.cal-more { font-size: 11px; color: #8a8a8a; padding-left: 2px; }
+
+/* ---- 일정 편집 사이드 패널 ---- */
+.cal-editor { flex: 0 0 340px; display: flex; flex-direction: column; border-left: 1px solid #232323; background: #131313; }
+.cal-editor-head { flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; padding: 18px 20px; border-bottom: 1px solid #232323; }
+.cal-editor-head h3 { margin: 0; font-size: 15px; font-weight: 600; }
+.cal-icon { display: grid; place-items: center; width: 30px; height: 30px; border: 0; border-radius: 8px; background: transparent; color: #9a9a9a; cursor: pointer; }
+.cal-icon:hover { background: #202020; color: #fff; }
+.cal-editor-body { flex: 1; min-height: 0; overflow-y: auto; padding: 16px 20px; }
+.cal-empty { color: #6e6e6e; font-size: 12.5px; margin: 4px 0 16px; }
+.cal-daylist { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+.cal-dayitem { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid #232323; border-radius: 9px; background: #161616; text-align: left; cursor: pointer; }
+.cal-dayitem:hover { background: #1c1c1c; }
+.cal-dot { flex: 0 0 auto; width: 9px; height: 9px; border-radius: 50%; background: #86b4f5; }
+.cal-dot.coral { background: #f0a184; } .cal-dot.violet { background: #b3a6f0; } .cal-dot.lime { background: #7ee08f; }
+.cal-dayitem-body { display: grid; min-width: 0; }
+.cal-dayitem-body strong { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cal-dayitem-body small { color: #7a7a7a; font-size: 11px; margin-top: 2px; }
+.cal-add { display: inline-flex; align-items: center; gap: 6px; width: 100%; justify-content: center; padding: 10px; border: 1px dashed #333; border-radius: 9px; background: transparent; color: #c4c4c4; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+.cal-add:hover { background: #1a1a1a; border-color: #444; color: #fff; }
+
+/* ---- 일정 폼 ---- */
+.cal-form { flex: 1; min-height: 0; overflow-y: auto; padding: 16px 20px; display: flex; flex-direction: column; gap: 14px; }
+.cal-field { display: flex; flex-direction: column; gap: 6px; }
+.cal-field > span { font-size: 11.5px; color: #8a8a8a; font-weight: 600; }
+.cal-field input, .cal-field textarea { border: 1px solid #262626; border-radius: 9px; background: #0f0f0f; color: #ededed; padding: 10px 11px; font-size: 13px; font-family: inherit; }
+.cal-field input:focus, .cal-field textarea:focus { outline: none; border-color: #3a4a6a; }
+.cal-field input:disabled { opacity: .4; }
+.cal-field textarea { min-height: 76px; resize: vertical; line-height: 1.5; }
+.cal-field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.cal-tones { display: flex; gap: 10px; }
+.cal-tone { width: 26px; height: 26px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; }
+.cal-tone.blue { background: #4a89f0; } .cal-tone.lime { background: #3fb950; } .cal-tone.coral { background: #f06b3e; } .cal-tone.violet { background: #8b7cf6; }
+.cal-tone.on { border-color: #fff; box-shadow: 0 0 0 2px #131313, 0 0 0 4px rgba(255,255,255,.25); }
+.cal-form-act { display: flex; align-items: center; justify-content: space-between; margin-top: 4px; }
+.cal-form-act-right { display: flex; gap: 8px; margin-left: auto; }
+.cal-del { display: inline-flex; align-items: center; gap: 5px; border: 1px solid #3a2222; border-radius: 8px; background: transparent; color: #f0868b; padding: 8px 12px; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+.cal-del:hover { background: rgba(240,86,139,.12); }
+.cal-cancel { border: 1px solid #2a2a2a; border-radius: 8px; background: transparent; color: #c4c4c4; padding: 8px 14px; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+.cal-cancel:hover { background: #1c1c1c; }
+.cal-save { border: 0; border-radius: 8px; background: #ededed; color: #0d0d0d; padding: 8px 16px; font-size: 12.5px; font-weight: 700; cursor: pointer; }
+.cal-save:hover { background: #fff; }
+
+/* =============== 할 일 · 메모 공용 패널 (.wsp) =============== */
+.wsp { height: 100%; display: flex; flex-direction: column; max-width: 760px; width: 100%; margin: 0 auto; padding: 18px clamp(18px, 3vw, 32px) 22px; }
+.wsp-head { flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.wsp-head-title { display: flex; align-items: baseline; gap: 10px; }
+.wsp-head-title h2 { margin: 0; font-size: 20px; font-weight: 600; }
+.wsp-count { color: #7a7a7a; font-size: 12.5px; }
+.wsp-primary { display: inline-flex; align-items: center; gap: 6px; border: 0; border-radius: 9px; background: #ededed; color: #0d0d0d; padding: 9px 15px; font-size: 13px; font-weight: 700; cursor: pointer; }
+.wsp-primary:hover { background: #fff; }
+
+.wsp-list { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 2px; }
+.wsp-empty { color: #6e6e6e; font-size: 13px; text-align: center; padding: 40px 0; }
+
+.wsp-item { display: flex; align-items: center; gap: 12px; padding: 13px 15px; border: 1px solid #222; border-radius: 11px; background: #161616; }
+.wsp-item:hover { border-color: #2c2c2c; }
+.wsp-item .wsp-item-act { opacity: 0; transition: opacity .13s; }
+.wsp-item:hover .wsp-item-act { opacity: 1; }
+.wsp-item-act { display: flex; gap: 2px; flex: 0 0 auto; }
+.wsp-item-act button { display: grid; place-items: center; width: 30px; height: 30px; border: 0; border-radius: 7px; background: transparent; color: #8a8a8a; cursor: pointer; }
+.wsp-item-act button:hover { background: #242424; color: #ededed; }
+
+/* 할 일 */
+.wsp-item.todo.done { opacity: .5; }
+.wsp-item.todo.done .wsp-item-body strong { text-decoration: line-through; }
+.wsp-check { flex: 0 0 auto; width: 20px; height: 20px; display: grid; place-items: center; border: 1px solid #3a3a3a; border-radius: 50%; background: transparent; color: #0d0d0d; cursor: pointer; }
+.wsp-item.todo.done .wsp-check { background: #3fb950; border-color: #3fb950; }
+.wsp-item-body { flex: 1; min-width: 0; display: grid; }
+.wsp-item-body strong { font-size: 13.5px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wsp-item-body span { color: #7a7a7a; font-size: 11.5px; margin-top: 2px; }
+.wsp-item.todo small { flex: 0 0 auto; color: #7a7a7a; font-size: 11.5px; white-space: nowrap; }
+.wsp-item.todo small.high { color: #f0568b; font-weight: 600; }
+
+/* 할 일 폼 */
+.wsp-form { flex: 0 0 auto; border: 1px solid #262626; border-radius: 12px; background: #131313; padding: 14px; margin-bottom: 12px; display: flex; flex-direction: column; gap: 10px; }
+.wsp-form-title { border: 1px solid #262626; border-radius: 9px; background: #0f0f0f; color: #ededed; padding: 10px 12px; font-size: 14px; }
+.wsp-form-title:focus { outline: none; border-color: #3a4a6a; }
+.wsp-form-row { display: grid; grid-template-columns: 1.2fr 1fr .7fr; gap: 10px; }
+.wsp-form-row input, .wsp-form-row select { border: 1px solid #262626; border-radius: 9px; background: #0f0f0f; color: #ededed; padding: 9px 10px; font-size: 12.5px; font-family: inherit; }
+.wsp-form-row input:focus, .wsp-form-row select:focus { outline: none; border-color: #3a4a6a; }
+.wsp-form-act { display: flex; justify-content: flex-end; gap: 8px; }
+.wsp-cancel { border: 1px solid #2a2a2a; border-radius: 8px; background: transparent; color: #c4c4c4; padding: 8px 14px; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+.wsp-cancel:hover { background: #1c1c1c; }
+.wsp-save { border: 0; border-radius: 8px; background: #ededed; color: #0d0d0d; padding: 8px 16px; font-size: 12.5px; font-weight: 700; cursor: pointer; }
+.wsp-save:hover { background: #fff; }
+
+/* 메모 */
+.wsp-memo-new { flex: 0 0 auto; border: 1px solid #262626; border-radius: 12px; background: #131313; padding: 12px; margin-bottom: 12px; }
+.wsp-memo-new textarea { width: 100%; height: 74px; resize: none; border: 0; background: transparent; color: #ededed; font-size: 13.5px; font-family: inherit; line-height: 1.6; }
+.wsp-memo-new textarea:focus { outline: none; }
+.wsp-memo-new-act { display: flex; align-items: center; justify-content: space-between; margin-top: 6px; }
+.wsp-memo-new-act span { color: #6e6e6e; font-size: 11px; }
+.wsp-memo-new-act button { display: inline-flex; align-items: center; gap: 6px; border: 0; border-radius: 8px; background: #ededed; color: #0d0d0d; padding: 7px 13px; font-size: 12.5px; font-weight: 700; cursor: pointer; }
+.wsp-memo-new-act button:disabled { opacity: .4; cursor: default; }
+.wsp-item.memo { align-items: flex-start; }
+.wsp-item.memo .wsp-item-body p { margin: 4px 0 0; font-size: 13px; line-height: 1.55; color: #d0d0d0; white-space: pre-wrap; word-break: break-word; }
+.wsp-memo-stamp { color: #6e6e6e; font-size: 11px; }
+.wsp-memo-edit { flex: 1; min-width: 0; }
+.wsp-memo-edit textarea { width: 100%; min-height: 70px; resize: vertical; border: 1px solid #3a4a6a; border-radius: 8px; background: #0f0f0f; color: #ededed; padding: 9px 10px; font-size: 13px; font-family: inherit; line-height: 1.55; }
+.wsp-memo-edit textarea:focus { outline: none; }
+.wsp-memo-edit-act { display: flex; justify-content: flex-end; gap: 6px; margin-top: 8px; }
+.wsp-icon { display: grid; place-items: center; width: 32px; height: 32px; border: 1px solid #2a2a2a; border-radius: 8px; background: transparent; color: #c4c4c4; cursor: pointer; }
+.wsp-icon:hover { background: #1c1c1c; }
+.wsp-icon.primary { border: 0; background: #ededed; color: #0d0d0d; }
+
+/* =========================== 반응형 =========================== */
+@media (max-width: 900px) {
+  /* 편집기는 데스크톱에서 우측 컬럼, 좁은 화면에서는 하단 시트로 전환 */
+  .cal { position: relative; }
+  .cal-editor { position: absolute; left: 0; right: 0; bottom: 0; top: auto; flex-basis: auto; max-height: 72%; border-left: 0; border-top: 1px solid #2a2a2a; border-radius: 16px 16px 0 0; box-shadow: 0 -12px 32px rgba(0,0,0,.5); z-index: 5; }
+}
+
+@media (max-width: 760px) {
+  .ws { height: 100vh; }
+  .ws-head { padding: 12px 14px 0; }
+  .ws-tabs { flex: 1; }
+  .ws-tab { flex: 1; justify-content: center; padding: 9px 8px; }
+  .cal-main { padding: 14px 14px 16px; }
+  .cal-nav strong { font-size: 15px; min-width: 96px; }
+  .cal-grid { gap: 4px; }
+  .cal-cell { padding: 4px 5px; border-radius: 7px; }
+  .cal-chip { font-size: 11px; padding: 0 1px; }
+  .cal-chip em { display: none; }
+  .wsp { padding: 14px 14px 16px; }
+}
