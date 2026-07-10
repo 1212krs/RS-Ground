@@ -7,8 +7,10 @@
 const BRANCH_COLORS = ['#6C5CE7', '#1FA25A', '#E8871E', '#F2B705', '#3B82F6']
 const CENTER_COLOR = '#E5484D'
 
-const W = 1100
-const H = 820
+// 정사각형 캔버스: 가지가 360도로 고르게 뻗으므로 가로/세로 여유가 같아야
+// 위/아래 방향 가지의 세부 노드가 캔버스 밖으로 잘리지 않는다.
+const W = 1150
+const H = 1150
 const CX = W / 2
 const CY = H / 2
 
