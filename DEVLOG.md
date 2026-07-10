@@ -511,3 +511,5 @@ UMAP 단계에서 `TypeError: check_array() got an unexpected keyword argument '
 **사용자 결정(2026-07-10):** STT(음성) 제외(비용), 액션 아이템=할 일 연동, 회의록 서버 저장+목록 다시 보기(재분석 비용 0), 용어 설명은 분석 시 일괄 생성(호출 1번).
 
 **설계 요점:** `report/composer.py`의 검증된 방식 재사용(urllib+JSON 스키마 강제, 의존성 0), `claude-sonnet-5`, `app.db`에 `meetings` 표 신규(영구 디스크), 새 API `POST/GET/DELETE /api/meeting*`. **주의: `auth/api.py`의 `PROTECTED_PREFIXES`에 `/api/meeting` 추가 필수**(안 하면 비로그인 Claude 호출 구멍). 전문 최대 3만 자 제한. 구현은 PRD 7장 순서(백엔드→뼈대→SVG→할일 연동→목록→검증)로 진행 예정 — 아직 미구현.
+
+**범위 확장(같은 날, 사용자 확정):** 확장 아이디어 ①~⑥을 범위에 포함하되 **3차수로 분할** — 1차(코어+①일정 연동: 분석 JSON에 `schedule_items`, 할일과 같은 패턴으로 캘린더 추가), 2차(②회의챗=전문 통째 컨텍스트 질문, ③hwpx 회의록 다운로드=report 엔진 재사용), 3차(④시리즈별 액션 진행 추적, ⑤용어집 누적, ⑥마인드맵 PNG 저장). ⑦RAG 색인·⑧참석자별 보기는 나중 검토로 보류. 각 차수 완료 시 배포하고 다음 차수 진행("기능 하나씩" 원칙 유지). PRD-Meeting.md 2·3·6·7장 갱신.
