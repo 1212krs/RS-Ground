@@ -466,3 +466,27 @@ UMAP 단계에서 `TypeError: check_array() got an unexpected keyword argument '
 
 **다음에 할 것 (6단계):**
 - GitHub↔Render/Vercel 연결로 실제 배포. 절차는 `docs/DEPLOY.md` 참고. 이후 `git push`가 곧 자동배포.
+
+### 2026-07-10 (이어짐) 시큐어코딩 1차 적용
+
+**무엇을 했나:**
+- 공통 보안 유틸 `backend/security.py`를 추가했다. 요청 크기 제한, 업로드 크기 제한, JSON 크기 제한, 문자열 길이 제한, 보안 응답 헤더, Host 허용 목록 처리를 한 곳에 모았다.
+- FastAPI 응답에 `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`, `Cache-Control`을 붙이도록 했다. HTTPS 요청에는 HSTS도 붙는다.
+- `TrustedHostMiddleware`를 적용해 Host header 공격 가능성을 줄였다. 로컬 기본값은 `127.0.0.1`, `localhost`, `testserver`이고, 배포에서는 `RSG_ALLOWED_HOSTS` 환경변수로 실제 백엔드 host를 지정한다.
+- CORS 설정에서 `FRONTEND_ORIGINS=*` 같은 와일드카드가 들어오면 서버가 뜨지 않도록 막았다. credentials를 쓰는 구조에서는 와일드카드 CORS가 위험하기 때문이다.
+- 인증 세션 저장 방식을 강화했다. 새 세션은 토큰 원문 대신 SHA-256 해시를 저장하고, 기본 7일 만료(`RSG_SESSION_TTL_DAYS`)를 둔다. 기존 DB와 충돌하지 않도록 `token_hash`, `expires_at` 컬럼을 자동 추가하는 형태로 구성했다.
+- 로그인 입력 길이 제한을 추가했다. `loginId`는 100자, `password`는 256자까지 허용한다.
+- RAG 문서 업로드는 무제한 `read()` 대신 제한된 크기만 읽도록 바꾸고, 카테고리/파일명/질문 길이와 `top_k` 범위를 검증한다.
+- 보고서 API는 제목, 개요, 템플릿명, 파일명, 업로드 파일 크기, 생성 payload 크기를 제한한다.
+- 워크스페이스 저장 API는 저장 JSON 크기, scalar 문자열 길이, list 항목 수(최대 1000개)를 제한한다.
+- `render.yaml`에 `RSG_ALLOWED_HOSTS` 환경변수 항목을 추가했다.
+
+**검증한 내용:**
+- `python -m py_compile backend\security.py backend\main.py backend\rag\config.py backend\rag\api.py backend\auth\api.py backend\auth\store.py backend\report\api.py backend\store\api.py` 통과.
+- `npm.cmd test` 통과: 테스트 파일 3개, 테스트 11개 모두 성공.
+- `python -c "import main; print('ok', main.app.title)"`로 통합 앱 import 확인. 현재 시스템 Python에는 `pdfplumber`가 없어 RAG는 fallback 모드로 뜨지만, 의존성이 설치된 venv/배포 환경에서는 기존처럼 RAG 앱이 로드된다.
+
+**운영 주의사항:**
+- `backend/.env`에 실제 API 키처럼 보이는 값이 있었다. git 추적 대상은 아니지만, 노출 가능성이 있었으므로 Anthropic/Upstage 콘솔에서 해당 키를 재발급하고 기존 키를 폐기하는 것을 권장한다.
+- 배포 시 Render의 `RSG_ALLOWED_HOSTS`에는 실제 백엔드 host를 넣어야 한다. 예: `rs-ground-api.onrender.com`. 여러 host가 필요하면 쉼표로 구분한다.
+- 배포 시 `FRONTEND_ORIGINS`에는 실제 Vercel 주소를 넣는다. 예: `https://rs-ground.vercel.app`.

@@ -22,6 +22,7 @@ from starlette.responses import JSONResponse
 
 from rag import config
 from . import store
+from security import require_max_len
 
 router = APIRouter(prefix="/api/auth")
 
@@ -53,6 +54,8 @@ def require_user(authorization: str | None = Header(default=None)) -> dict:
 def login(payload: dict = Body(...)):
     login_id = (payload.get("loginId") or "").strip()
     password = payload.get("password") or ""
+    require_max_len(login_id, "loginId", 100)
+    require_max_len(password, "password", 256)
     user = store.authenticate(login_id, password)
     if user is None:
         raise HTTPException(status_code=401, detail="아이디 또는 비밀번호가 올바르지 않습니다.")

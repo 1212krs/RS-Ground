@@ -12,6 +12,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 from fastapi import Body, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from . import config
 from .chat import answer_question
@@ -19,6 +20,15 @@ from .chunker import chunk_directory, write_chunks_jsonl
 from .embedder import EmbeddingCache, embed_passages
 from .extractors import PLAIN_TEXT_SUFFIXES, SUPPORTED_SUFFIXES
 from .store import get_client, get_collection, reset_collection, upsert_chunks
+from security import (
+    BodySizeLimitMiddleware,
+    MAX_RAG_UPLOAD_BYTES,
+    SecurityHeadersMiddleware,
+    allowed_hosts,
+    clamp_int,
+    read_upload_limited,
+    require_max_len,
+)
 
 # 실행 위치(cwd)에 상관없이 backend/.env 를 확실히 읽도록 경로를 고정한다.
 # (config.BACKEND_DIR == backend/)
@@ -34,9 +44,13 @@ def _safe_name(name: str) -> str:
     base = name.replace("\\", "/").split("/")[-1].strip()
     if base in ("", ".", "..") or ":" in base:
         raise HTTPException(400, "허용되지 않는 이름입니다: %r" % name)
+    require_max_len(base, "name", 120)
     return base
 
 app = FastAPI(title="RS-Ground RAG API")
+app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(BodySizeLimitMiddleware)
+app.add_middleware(TrustedHostMiddleware, allowed_hosts=allowed_hosts())
 
 # Vite 프록시를 쓰면 브라우저 입장에서는 동일 출처라 사실 필요 없지만,
 # curl 등으로 API를 직접 두드려볼 때를 위해 열어둔다.
@@ -75,12 +89,14 @@ async def upload_document(
     category_l2: str = Form(""),
     category_l3: str = Form(""),
 ):
+    for category in (category_l1, category_l2, category_l3):
+        require_max_len(category.strip(), "category", 80)
     suffix = Path(file.filename).suffix.lower()
     if suffix not in SUPPORTED_SUFFIXES:
         allowed = ", ".join(sorted(SUPPORTED_SUFFIXES))
         raise HTTPException(400, f"지원하지 않는 파일 형식입니다({suffix}). 지원 형식: {allowed}")
 
-    content = await file.read()
+    content = await read_upload_limited(file, MAX_RAG_UPLOAD_BYTES)
     if suffix in PLAIN_TEXT_SUFFIXES:
         try:
             content.decode("utf-8")
@@ -115,12 +131,14 @@ def chat(payload: dict = Body(...)):
     question = (payload.get("question") or "").strip()
     if not question:
         raise HTTPException(400, "질문을 입력하세요.")
+    require_max_len(question, "question", 2000)
     category_l1 = (payload.get("category_l1") or "").strip() or None
+    if category_l1:
+        require_max_len(category_l1, "category_l1", 80)
     scope_label = (payload.get("scope_label") or "").strip() or category_l1
-    try:
-        top_k = int(payload.get("top_k") or config.TOP_K_DEFAULT)
-    except (TypeError, ValueError):
-        top_k = config.TOP_K_DEFAULT
+    if scope_label:
+        require_max_len(scope_label, "scope_label", 80)
+    top_k = clamp_int(payload.get("top_k"), config.TOP_K_DEFAULT, 1, 20)
     return answer_question(question, category_l1=category_l1, top_k=top_k, scope_label=scope_label)
 
 

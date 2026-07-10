@@ -28,6 +28,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import APIRouter, Body, HTTPException
+from security import require_json_size, require_max_len
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 DB_PATH = BACKEND_DIR.parent / "data" / "app.db"
@@ -75,10 +76,15 @@ def read(key: str):
 def write(key: str, payload: dict = Body(...)):
     _check_key(key)
     data = payload.get("data")
+    require_json_size(data, "data")
     if key in LIST_KEYS and not isinstance(data, list):
         raise HTTPException(status_code=400, detail="data 필드는 배열이어야 합니다.")
     if key in SCALAR_KEYS and not isinstance(data, str):
         raise HTTPException(status_code=400, detail="data 필드는 문자열이어야 합니다.")
+    if key in SCALAR_KEYS:
+        require_max_len(data, "data", 120)
+    if key in LIST_KEYS and len(data) > 1000:
+        raise HTTPException(status_code=400, detail="data 배열은 최대 1000개까지 저장할 수 있습니다.")
     now = datetime.now(timezone.utc).isoformat()
     text = json.dumps(data, ensure_ascii=False)
     conn = _connect()

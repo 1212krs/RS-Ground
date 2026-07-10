@@ -14,15 +14,20 @@
 from __future__ import annotations
 
 import hashlib
+import os
 import secrets
 import sqlite3
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from rag import config  # DATA_DIR(생성물 저장 경로). chromadb에 의존하지 않아 안전.
 
 DB_PATH = config.DATA_DIR / "app.db"
 
 _PBKDF2_ROUNDS = 200_000  # 계산을 일부러 무겁게 해 무차별 대입을 어렵게 한다.
+_SESSION_TTL_DAYS = int(os.environ.get("RSG_SESSION_TTL_DAYS", "7"))
+_MAX_LOGIN_ID_LEN = 100
+_MAX_PASSWORD_LEN = 256
+_MAX_DISPLAY_NAME_LEN = 100
 
 
 def _now() -> str:
@@ -45,10 +50,46 @@ def _connect() -> sqlite3.Connection:
         "CREATE TABLE IF NOT EXISTS sessions ("
         "  token TEXT PRIMARY KEY,"
         "  user_id INTEGER NOT NULL,"
-        "  created_at TEXT NOT NULL"
+        "  created_at TEXT NOT NULL,"
+        "  token_hash TEXT,"
+        "  expires_at TEXT"
         ")"
     )
+    cols = {row[1] for row in conn.execute("PRAGMA table_info(sessions)").fetchall()}
+    if "token_hash" not in cols:
+        conn.execute("ALTER TABLE sessions ADD COLUMN token_hash TEXT")
+    if "expires_at" not in cols:
+        conn.execute("ALTER TABLE sessions ADD COLUMN expires_at TEXT")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_sessions_token_hash ON sessions(token_hash)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions(expires_at)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_users_login_id ON users(login_id)")
+    conn.commit()
     return conn
+
+
+def _validate_login_id(login_id: str) -> str:
+    login_id = login_id.strip()
+    if not login_id or len(login_id) > _MAX_LOGIN_ID_LEN:
+        raise ValueError("아이디는 1~100자여야 합니다.")
+    return login_id
+
+
+def _validate_password(password: str) -> str:
+    if not password or len(password) > _MAX_PASSWORD_LEN:
+        raise ValueError("비밀번호는 1~256자여야 합니다.")
+    return password
+
+
+def _token_hash(token: str) -> str:
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def _session_expires_at() -> str:
+    return (datetime.now(timezone.utc) + timedelta(days=_SESSION_TTL_DAYS)).isoformat()
+
+
+def _purge_expired_sessions(conn: sqlite3.Connection) -> None:
+    conn.execute("DELETE FROM sessions WHERE expires_at IS NOT NULL AND expires_at <= ?", (_now(),))
 
 
 # --- 비밀번호 해시 ---------------------------------------------------------
@@ -77,10 +118,11 @@ def verify_password(password: str, stored: str) -> bool:
 
 def create_user(login_id: str, password: str, display_name: str | None = None) -> dict:
     """새 회원을 추가한다. login_id가 이미 있으면 ValueError."""
-    login_id = login_id.strip()
-    if not login_id or not password:
-        raise ValueError("아이디와 비밀번호는 비어 있을 수 없습니다.")
+    login_id = _validate_login_id(login_id)
+    password = _validate_password(password)
     display_name = (display_name or login_id).strip()
+    if not display_name or len(display_name) > _MAX_DISPLAY_NAME_LEN:
+        raise ValueError("표시 이름은 1~100자여야 합니다.")
     conn = _connect()
     try:
         try:
@@ -98,13 +140,13 @@ def create_user(login_id: str, password: str, display_name: str | None = None) -
 
 def set_password(login_id: str, new_password: str) -> bool:
     """비밀번호를 바꾼다. 해당 아이디가 없으면 False."""
-    if not new_password:
-        raise ValueError("비밀번호는 비어 있을 수 없습니다.")
+    login_id = _validate_login_id(login_id)
+    new_password = _validate_password(new_password)
     conn = _connect()
     try:
         cur = conn.execute(
             "UPDATE users SET pw_hash = ? WHERE login_id = ?",
-            (hash_password(new_password), login_id.strip()),
+            (hash_password(new_password), login_id),
         )
         conn.commit()
         return cur.rowcount > 0
@@ -150,6 +192,9 @@ def count_users() -> int:
 
 def authenticate(login_id: str, password: str) -> dict | None:
     """아이디+비번이 맞으면 사용자 정보를, 틀리면 None을 돌려준다."""
+    login_id = login_id.strip()
+    if not login_id or len(login_id) > _MAX_LOGIN_ID_LEN or len(password) > _MAX_PASSWORD_LEN:
+        return None
     conn = _connect()
     try:
         row = conn.execute(
@@ -168,11 +213,13 @@ def authenticate(login_id: str, password: str) -> dict | None:
 def create_session(user_id: int) -> str:
     """새 출입증(토큰)을 만들어 저장하고 돌려준다."""
     token = secrets.token_urlsafe(32)
+    hashed = _token_hash(token)
     conn = _connect()
     try:
+        _purge_expired_sessions(conn)
         conn.execute(
-            "INSERT INTO sessions (token, user_id, created_at) VALUES (?, ?, ?)",
-            (token, user_id, _now()),
+            "INSERT INTO sessions (token, token_hash, user_id, created_at, expires_at) VALUES (?, ?, ?, ?, ?)",
+            (hashed, hashed, user_id, _now(), _session_expires_at()),
         )
         conn.commit()
     finally:
@@ -184,14 +231,20 @@ def user_for_token(token: str | None) -> dict | None:
     """출입증(토큰)에 해당하는 사용자를 돌려준다. 없거나 유효하지 않으면 None."""
     if not token:
         return None
+    if len(token) > 256:
+        return None
+    hashed = _token_hash(token)
     conn = _connect()
     try:
+        _purge_expired_sessions(conn)
         row = conn.execute(
             "SELECT u.id, u.login_id, u.display_name"
             " FROM sessions s JOIN users u ON u.id = s.user_id"
-            " WHERE s.token = ?",
-            (token,),
+            " WHERE (s.token_hash = ? OR s.token = ?)"
+            " AND (s.expires_at IS NULL OR s.expires_at > ?)",
+            (hashed, token, _now()),
         ).fetchone()
+        conn.commit()
     finally:
         conn.close()
     if row is None:
@@ -203,9 +256,10 @@ def destroy_session(token: str | None) -> None:
     """출입증을 폐기한다(로그아웃)."""
     if not token:
         return
+    hashed = _token_hash(token)
     conn = _connect()
     try:
-        conn.execute("DELETE FROM sessions WHERE token = ?", (token,))
+        conn.execute("DELETE FROM sessions WHERE token_hash = ? OR token = ?", (hashed, token))
         conn.commit()
     finally:
         conn.close()

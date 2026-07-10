@@ -19,10 +19,15 @@ try:
 except ImportError as ex:  # chromadb 등 미설치 환경 — 보고서 API만으로 기동
     from fastapi import FastAPI
     from fastapi.middleware.cors import CORSMiddleware
+    from starlette.middleware.trustedhost import TrustedHostMiddleware
 
     from rag import config  # allowed_origins()는 chromadb에 의존하지 않아 이 경로에서도 안전
+    from security import BodySizeLimitMiddleware, SecurityHeadersMiddleware, allowed_hosts
 
     app = FastAPI(title="RS-Ground API (report only)")
+    app.add_middleware(SecurityHeadersMiddleware)
+    app.add_middleware(BodySizeLimitMiddleware)
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=allowed_hosts())
     app.add_middleware(
         CORSMiddleware,
         allow_origins=config.allowed_origins(),

@@ -25,6 +25,8 @@ services:
       # 값은 Vercel 배포 후 정해지는 주소로 대시보드에서 입력(예: https://rs-ground.vercel.app)
       - key: FRONTEND_ORIGINS
         sync: false
+      - key: RSG_ALLOWED_HOSTS
+        sync: false
 
       # --- 생성 데이터(벡터DB 등)를 영구 디스크에 저장하도록 경로 지정 ---
       - key: RSG_DATA_DIR

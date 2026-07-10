@@ -23,6 +23,7 @@ from fastapi.responses import Response
 from .composer import ai_status, compose
 from .engine import build_hwpx, form_to_doc, get_template, list_templates
 from .extractors import extract_file_text
+from security import MAX_REPORT_UPLOAD_BYTES, read_upload_limited, require_json_size, require_max_len
 
 # 실행 위치(cwd)에 상관없이 backend/.env 를 확실히 읽도록 경로를 고정한다.
 # (이 파일은 backend/report/api.py 이므로 parents[1] == backend/)
@@ -31,7 +32,7 @@ load_dotenv(Path(__file__).resolve().parents[1] / ".env")  # ANTHROPIC_API_KEY �
 router = APIRouter(prefix="/api/report")
 
 MAX_FILES = 3
-MAX_FILE_BYTES = 5 * 1024 * 1024
+MAX_FILE_BYTES = MAX_REPORT_UPLOAD_BYTES
 
 
 @router.get("/templates")
@@ -53,19 +54,23 @@ async def compose_report(
     include_table: bool = Form(True),
     files: list[UploadFile] = File(default=[]),
 ):
-    if not title.strip():
+    title = title.strip()
+    brief = brief.strip()
+    template = template.strip()
+    if not title:
         raise HTTPException(400, "제목을 입력하세요.")
+    require_max_len(title, "title", 150)
+    require_max_len(brief, "brief", 6000)
+    require_max_len(template, "template", 80)
     tpl = get_template(template)
 
     extracted = []
     for f in files[:MAX_FILES]:
-        data = await f.read()
-        if len(data) > MAX_FILE_BYTES:
-            extracted.append((f.filename, "[파일이 5MB를 초과하여 제외됨]"))
-            continue
+        require_max_len(f.filename or "file", "filename", 120)
+        data = await read_upload_limited(f, MAX_FILE_BYTES)
         extracted.append((f.filename, extract_file_text(f.filename, data)))
 
-    req = {"title": title.strip(), "brief": brief.strip(),
+    req = {"title": title, "brief": brief,
            "include_table": include_table, "files": extracted}
     engine, doc, reason = compose(req, tpl)
     return {"engine": engine, "doc": doc, "reason": reason,
@@ -75,6 +80,7 @@ async def compose_report(
 
 @router.post("/generate")
 def generate_report(payload: dict = Body(...)):
+    require_json_size(payload, "payload")
     tpl = get_template(payload.get("template", ""))
     try:
         doc = form_to_doc(payload, tpl)

@@ -3,6 +3,8 @@
 import os
 from pathlib import Path
 
+from security import ensure_no_wildcard
+
 
 def allowed_origins() -> list[str]:
     """CORS 친구 명단(이 주소들에서 온 브라우저 요청만 허락한다).
@@ -14,6 +16,7 @@ def allowed_origins() -> list[str]:
     origins = ["http://127.0.0.1:5173", "http://localhost:5173"]
     extra = os.environ.get("FRONTEND_ORIGINS", "")
     origins += [o.strip() for o in extra.split(",") if o.strip()]
+    ensure_no_wildcard(origins, "FRONTEND_ORIGINS")
     return origins
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
