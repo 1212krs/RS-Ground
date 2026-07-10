@@ -6,7 +6,6 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -140,56 +139,6 @@ def chat(payload: dict = Body(...)):
         require_max_len(scope_label, "scope_label", 80)
     top_k = clamp_int(payload.get("top_k"), config.TOP_K_DEFAULT, 1, 20)
     return answer_question(question, category_l1=category_l1, top_k=top_k, scope_label=scope_label)
-
-
-@app.get("/api/rag/umap")
-def get_umap():
-    """저장된 임베딩 지도 좌표를 돌려준다. 색인이 바뀌어 좌표가 낡았으면 stale=True."""
-    collection = get_collection(get_client())
-    collection_count = collection.count()
-    try:
-        points = json.loads(config.UMAP_COORDS_PATH.read_text(encoding="utf-8"))
-    except FileNotFoundError:
-        points = []
-    return {
-        "points": points,
-        "count": len(points),
-        "collection_count": collection_count,
-        "stale": len(points) != collection_count,
-    }
-
-
-@app.post("/api/rag/umap")
-def rebuild_umap():
-    """현재 ChromaDB에 색인된 모든 조각으로 UMAP 2D 좌표를 다시 계산해 저장한다.
-    임베딩은 이미 저장된 것을 그대로 꺼내 쓰므로 임베딩 API 비용은 들지 않는다.
-    (umap-learn 첫 호출은 컴파일 때문에 수십 초 걸릴 수 있음 — 그래서 업로드마다 자동으로 하지 않고 요청 시에만 계산)."""
-    # UMAP은 무거운 의존성이라 서버 시작을 느리게 하지 않도록 이 안에서만 import 한다.
-    from .visualize import compute_umap_coords, save_coords
-
-    collection = get_collection(get_client())
-    data = collection.get(include=["embeddings", "metadatas", "documents"])
-    embeddings = data.get("embeddings")
-    embeddings = list(embeddings) if embeddings is not None else []
-    if len(embeddings) < 3:
-        raise HTTPException(400, "지도를 그리려면 색인된 조각이 최소 3개 이상 필요합니다.")
-
-    metas = data["metadatas"]
-    docs = data["documents"]
-    coords = compute_umap_coords(embeddings)
-    metadatas = [
-        {
-            "source": m.get("source", ""),
-            "chunk_index": m.get("chunk_index", 0),
-            "category_l1": m.get("category_l1", ""),
-            "text_preview": (docs[i] or "")[:100].replace("\n", " "),
-        }
-        for i, m in enumerate(metas)
-    ]
-    save_coords(coords, metadatas)
-    points = [{"x": float(x), "y": float(y), **m} for (x, y), m in zip(coords, metadatas)]
-    return {"points": points, "count": len(points),
-            "collection_count": len(points), "stale": False}
 
 
 @app.get("/api/rag/documents")

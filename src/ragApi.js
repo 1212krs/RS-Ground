@@ -23,10 +23,6 @@ export const uploadDocument = (file, { categoryL1 = '', categoryL2 = '', categor
   return req('/api/rag/documents', { method: 'POST', body: formData })
 }
 
-// 임베딩 지도(UMAP 2D 좌표). GET=저장된 좌표+stale 여부, POST=현재 색인으로 재계산(수십 초 소요).
-export const getUmap = () => req('/api/rag/umap')
-export const rebuildUmap = () => req('/api/rag/umap', { method: 'POST' })
-
 // 근거 기반 질의응답. categoryL1을 주면 그 분야 문서만 검색(예: '회계'=회계챗), 없으면 전체(AI챗).
 export const chat = ({ question, categoryL1 = '', scopeLabel = '', topK } = {}) => {
   const body = { question }

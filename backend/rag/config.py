@@ -34,8 +34,6 @@ DATA_DIR = Path(os.environ.get("RSG_DATA_DIR") or (PROJECT_ROOT / "data"))
 CHUNKS_PATH = DATA_DIR / "chunks.jsonl"
 CACHE_DB_PATH = DATA_DIR / "cache" / "embeddings.db"
 CHROMA_DIR = DATA_DIR / "chroma"
-UMAP_COORDS_PATH = DATA_DIR / "umap_coords.json"
-VISUALIZATION_PATH = PROJECT_ROOT / "output" / "embedding_map.html"
 
 # 업스테이지 임베딩 API. 문서(저장용)와 질문(검색용)은 반드시 다른 모델을 쓴다 — PRD-RAG.md 4.2절.
 UPSTAGE_API_URL = "https://api.upstage.ai/v1/embeddings"

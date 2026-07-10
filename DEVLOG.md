@@ -490,3 +490,16 @@ UMAP 단계에서 `TypeError: check_array() got an unexpected keyword argument '
 - `backend/.env`에 실제 API 키처럼 보이는 값이 있었다. git 추적 대상은 아니지만, 노출 가능성이 있었으므로 Anthropic/Upstage 콘솔에서 해당 키를 재발급하고 기존 키를 폐기하는 것을 권장한다.
 - 배포 시 Render의 `RSG_ALLOWED_HOSTS`에는 실제 백엔드 host를 넣어야 한다. 예: `rs-ground-api.onrender.com`. 여러 host가 필요하면 쉼표로 구분한다.
 - 배포 시 `FRONTEND_ORIGINS`에는 실제 Vercel 주소를 넣는다. 예: `https://rs-ground.vercel.app`.
+
+### 2026-07-10 (이어서) — 임베딩 지도(UMAP) 기능 제거
+
+**왜:** 지도(UMAP) 계산은 메모리를 많이 써서 Render Starter(512MB)에서 OOM을 낸다. 특히 실행 중 서버 안에서 도는 `POST /api/rag/umap`(지도 새로 만들기)를 누르면 서버 프로세스가 통째로 죽어 서비스가 다운될 위험이 있었다. 지도는 선택적 시각화라 채팅·지식·보고서·워크스페이스에는 불필요 → 사용자 결정으로 **기능 자체를 제거**.
+
+**무엇을 지웠나:**
+- 프론트: `src/pages/knowledge/EmbeddingMap.jsx` 삭제, `KnowledgePage.jsx`에서 목록/지도 토글·지도 렌더링·관련 상태/함수 제거(문서 목록만 남김), `ragApi.js`의 `getUmap`/`rebuildUmap` 제거.
+- 백엔드: `rag/api.py`의 `GET/POST /api/rag/umap` 두 엔드포인트 + 미사용 `import json` 제거. `rag/pipeline.py`를 청킹→임베딩→ChromaDB 저장 3단계로 단순화(UMAP·시각화 단계와 `--no-viz` 플래그 제거). `rag/visualize.py` 삭제. `rag/config.py`의 `UMAP_COORDS_PATH`·`VISUALIZATION_PATH` 제거.
+- 의존성: `requirements.txt`에서 `umap-learn`·`scikit-learn`·`plotly` 제거(지도 전용). `numpy`는 chromadb가 쓰므로 유지. → Render 빌드가 빨라지고 메모리 사용도 준다.
+
+**검증:** 백엔드 `import main` 정상(라우트 16, umap 라우트 없음), `python -m rag.pipeline index` 실제 실행 1097청크 저장 exit 0. 프론트 `npm run build` 성공 + `npm test` 11개 통과.
+
+**재색인 명령 변경:** 이제 `python -m rag.pipeline index` (더 이상 `--no-viz` 불필요).
