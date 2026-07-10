@@ -20,10 +20,13 @@ except ImportError as ex:  # chromadb 등 미설치 환경 — 보고서 API만�
     from fastapi import FastAPI
     from fastapi.middleware.cors import CORSMiddleware
 
+    from rag import config  # allowed_origins()는 chromadb에 의존하지 않아 이 경로에서도 안전
+
     app = FastAPI(title="RS-Ground API (report only)")
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["http://127.0.0.1:5173", "http://localhost:5173"],
+        allow_origins=config.allowed_origins(),
+        allow_credentials=True,  # 로그인 쿠키 주고받기용(배포 시 로그인 단계에서 사용)
         allow_methods=["*"],
         allow_headers=["*"],
     )
@@ -33,9 +36,16 @@ except ImportError as ex:  # chromadb 등 미설치 환경 — 보고서 API만�
 
 from report.api import router as report_router
 from store.api import router as store_router
+from auth.api import AuthMiddleware, router as auth_router
 
+# 로그인 창구(/api/auth/*)를 연다.
+app.include_router(auth_router)
 app.include_router(report_router)
 app.include_router(store_router)
 
+# 문지기: /api/rag·/api/report·/api/store 요청에 유효한 출입증(토큰)이 있는지 검사한다.
+# (라우터 등록 뒤에 추가해도 요청 처리 시점에 적용된다. /api/auth·OPTIONS는 통과.)
+app.add_middleware(AuthMiddleware)
+
 if _rag_loaded:
-    print("[main] RAG + 보고서 API 기동")
+    print("[main] RAG + 보고서 API 기동 (로그인 보호 켜짐)")

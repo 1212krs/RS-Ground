@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { API_BASE, authHeaders } from '../apiBase'
 
 // 서버(SQLite)에 동기화되는 state(배열 또는 문자열). useStoredState(localStorage)를 대체한다.
 // 목표: 브라우저를 지우거나 다른 브라우저·PC로 바꿔도 데이터가 유지되게 한다.
@@ -10,7 +11,7 @@ import { useEffect, useRef, useState } from 'react'
 //  - 값이 바뀌면 캐시에 쓰고, 디바운스 후 서버에 저장한다. 서버가 꺼져 있으면
 //    캐시에만 남아 있다가 다음에 서버가 살아나면 반영된다.
 
-const API = '/api/store'
+const API = API_BASE + '/api/store'
 
 function readCache(cacheKey, legacyKey) {
   for (const k of [cacheKey, legacyKey].filter(Boolean)) {
@@ -29,7 +30,7 @@ function writeCache(cacheKey, value) {
 async function putServer(key, value) {
   await fetch(`${API}/${key}`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify({ data: value }),
   })
 }
@@ -44,7 +45,7 @@ export function useServerState(key, fallback, legacyKey) {
     let cancelled = false
     ;(async () => {
       try {
-        const res = await fetch(`${API}/${key}`)
+        const res = await fetch(`${API}/${key}`, { headers: authHeaders() })
         if (res.ok) {
           const body = await res.json()
           if (body.data != null) { // 배열·문자열 등 저장된 값이 있으면 사용

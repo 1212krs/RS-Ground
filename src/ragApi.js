@@ -1,7 +1,12 @@
+import { API_BASE, authHeaders } from './apiBase'
+
 // RAG 백엔드(FastAPI, backend/rag/api.py)와 통신하는 함수 모음.
 // vite.config.js의 server.proxy['/api/rag']를 통해 127.0.0.1:8000으로 전달된다.
 async function req(path, options = {}) {
-  const res = await fetch(path, options)
+  const res = await fetch(API_BASE + path, {
+    ...options,
+    headers: { ...authHeaders(), ...(options.headers || {}) },
+  })
   const data = await res.json().catch(() => ({}))
   if (!res.ok) throw new Error(data.detail || data.error || `요청 실패 (HTTP ${res.status})`)
   return data

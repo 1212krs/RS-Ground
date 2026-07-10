@@ -4,7 +4,7 @@
 사실만 기록하며, 아직 구현되지 않은 것은 "미구현/계획"으로 명시합니다.
 
 - **최초 작성**: 2026-07-05
-- **최종 업데이트**: 2026-07-08
+- **최종 업데이트**: 2026-07-10
 - **대상 저장소**: `c:\Users\krs47\Documents\RS-Ground`
 
 > **이 프로젝트가 존재하는 이유**: `RSA Personal Agent`(`c:\Users\krs47\Documents\RSA Personal Agent`, remote `github.com/1212krs/RSA-Ground`)를 전면 재구축하기로 하면서, 실제 작업은 이 폴더(`RS-Ground`)에서 처음부터 새로 시작하기로 함(2026-07-05). `RSA Personal Agent`는 참고용으로 그대로 두고 더 이상 수정하지 않는다.
@@ -44,8 +44,7 @@ npm.cmd run preview  # 빌드 결과 미리보기
 npm.cmd run test     # vitest 실행 (라우팅 가드 2개 + 로그인 폼 전환 1개, 총 3개 테스트)
 ```
 
-- **로그인은 현재 가짜(mock)다.** `vite.config.js`의 `mockAuth()` 플러그인이 dev 서버에서만 동작하며, 아이디/비밀번호를 실제로 검사하지 않고 무조건 로그인에 성공시킨다(쿠키 `rsg_mock_session` 발급). **진짜 백엔드가 생기면 이 플러그인을 통째로 지우고** `server.proxy`에 실제 백엔드 주소를 연결할 것.
-- 이 mock은 `vite build` 결과물(정적 파일)에는 포함되지 않는다(Vite `configureServer` 훅은 dev 전용).
+- **로그인은 이제 진짜다(2026-07-10).** 가짜 `mockAuth`는 제거됨. 백엔드 `backend/auth/`가 아이디+비밀번호(사람별 계정)를 검사하고 **출입증(토큰)** 을 발급한다(토큰-헤더 방식, 쿠키 아님 — 배포 시 다른 출처 대응). 백엔드가 `/api/rag`·`/api/report`·`/api/store` 요청에 유효 토큰이 없으면 401로 막는다. **그래서 dev에서도 백엔드를 띄우고 로그인해야 기능이 동작한다.** 공개 회원가입 없음 — 계정은 `cd backend && ./venv/Scripts/python.exe -m auth.manage add <아이디> <비번> "<표시이름>"`로 만든다. (현재 로컬 `data/app.db`에 `admin`/`admin1234` 존재 — 비번 변경 권장.)
 - 포트를 5173으로 고정한 이유: 포트가 바뀌면 origin이 달라져 `localStorage` 데이터(할 일/메모)가 분리되어 사라진 것처럼 보이기 때문.
 - **지식 탭·보고서 탭을 쓰려면 백엔드 API 서버도 따로 띄워야 한다.** (2026-07-08 갱신) `npm run dev`만으로는 안 되고, 별도 터미널에서:
   ```powershell
@@ -177,6 +176,8 @@ backend/
 
 ## 9. 변경 이력 (AGENT.md 자체)
 
+- 2026-07-10: **배포 준비 5단계 — 로그인 완성.** 사람별 계정(아이디+비번) 로그인 구현. 백엔드 신규 `backend/auth/`(store=SQLite users/sessions + pbkdf2 해시, api=login/logout/me 라우터 + `AuthMiddleware` 문지기 + `require_user`, manage=계정 CLI, 의존성 0). `main.py`에 라우터·미들웨어 연결. 프론트: `apiBase.js`에 토큰 보관/`authHeaders()` 추가, `api.js`가 로그인 시 토큰 저장·요청마다 지참·401 시 토큰 삭제, 나머지 3 api 파일 fetch에 토큰 병합, `vite.config.js` mockAuth 제거+`/api/auth` 프록시. 쿠키 대신 토큰-헤더(다른 출처 대응). 검증: build/test(11) 통과 + 실서버·실계정(admin) end-to-end(로그인→토큰→보호 API 200, 무토큰 401). DEPLOY.md 경고 갱신. 상세 DEVLOG 2026-07-10. **다음: 6단계 실제 배포.**
+- 2026-07-10: **배포 준비 1·2단계(진행 중).** 인터넷 배포 계획 수립 — 화면=Vercel, 백엔드=Render(영구 디스크). 임베딩 데이터는 옮기지 않고 서버에서 `python -m rag.pipeline index`로 재색인(원본 `data/raw`만 git에 있고 작음). ① 프론트 백엔드 주소를 `src/apiBase.js`의 `API_BASE`(=`import.meta.env.VITE_API_BASE`)로 스위치화, `/api`를 부르는 4파일이 이를 앞에 붙임(dev에선 빈 값이라 기존과 동일). ② CORS 허용 목록을 `rag/config.py`의 `allowed_origins()`로 통일 — 기본 localhost + 환경변수 `FRONTEND_ORIGINS`. `allow_credentials=True` 추가. 검증: `npm run build`/`npm test`(11개) 통과, 백엔드 앱 로드 정상. **남은 단계**: 3=render.yaml+영구디스크, 4=docs/DEPLOY.md, 5=로그인(현재 `mockAuth`는 dev 전용→배포 시 사라짐, 최소 잠금 필요), 6=GitHub 연결 자동배포. 상세는 DEVLOG 2026-07-10 참고.
 - 2026-07-08: **보고서 탭 실제 구현.** `backend/report/` 패키지 신규(hwpx 조립 엔진 + Claude API 본문 생성 + 참고파일 추출 + FastAPI 라우터, 전부 표준 라이브러리 — 의존성 추가 없음), `backend/main.py`(rag+report 통합 진입점, 실행 명령 `uvicorn main:app`으로 변경), 프론트 `ReportsPage.jsx`+`reportApi.js` 추가, `/reports` 라우트·다크 배경·`/api/report` 프록시 연결. 서식은 "hwpx+지침 md 세트" 규약(`backend/report/templates/`), 지침은 3계층(기본<공통<서식)으로 AI 프롬프트에 주입. 엔진은 업무 PC에서 오프라인 검증 완료, FastAPI 실행 검증은 개발 PC 몫. `검토보고서.hwpx`는 업무 PC DRM 감염으로 이번에 제외(지침 md만 포함 — DRM 없는 hwpx를 templates에 넣으면 자동 등록).
 - 2026-07-07 (이어서 6): 문서 업로드 지원 형식을 PDF/DOCX/HWPX까지 확장(`backend/rag/extractors.py` 신규). HWPX는 한글 프로그램 없이 순수 Python(zip+XML)으로 파싱하도록 구현해 서버 안정성 확보. 이 컴퓨터의 한글 프로그램으로 실제 테스트 샘플(hwpx/docx/pdf)을 만들어 추출 결과를 검증하고, CLI·업로드 API 양쪽에서 실제 파일로 재검증.
 - 2026-07-07 (이어서 5): **지식 탭 실제 구현.** `backend/rag/api.py`(FastAPI) 신규 추가로 RAG 파이프라인을 웹에서 쓸 수 있게 열고, `src/pages/knowledge/KnowledgePage.jsx`에서 문서 업로드(.txt/.md, 분류 입력) + 색인 문서 목록 화면 구현. Vite에 `/api/rag` 프록시 추가(`vite.config.js`), `AppLayout.jsx`의 `NO_TOPBAR_PATHS`에 `/knowledge` 추가해 로그인 화면과 같은 검정 배경 적용. 사용자가 제시한 5색 브랜드 팔레트(보라/초록/오렌지/노랑/파랑, 로그인 화면 아이콘 색과 거의 동일)를 `.kb` 스코프 CSS 변수로 반영하되, 실제로는 blue(정보/카테고리 배지)·green(색인 완료 배지) 두 역할만 지금 화면에 필요한 만큼 적용(5색을 전부 남용하지 않음). curl 테스트 중 한글 파일명이 깨지는 걸 발견했는데 curl 자체의 인코딩 문제로 확인(Python `requests`로는 정상) — 실제 브라우저 업로드(FormData)는 영향 없음. 업로드 시마다 `data/raw/` 전체를 재색인하는 방식이라 지금 규모에선 API 비용 걱정 없음(임베딩 캐시가 계속 막아줌).

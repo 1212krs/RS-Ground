@@ -1,7 +1,12 @@
+import { API_BASE, authHeaders } from './apiBase'
+
 // 보고서 백엔드(FastAPI, backend/report/api.py)와 통신하는 함수 모음.
 // vite.config.js의 server.proxy['/api/report']를 통해 127.0.0.1:8000으로 전달된다.
 async function req(path, options = {}) {
-  const res = await fetch(path, options)
+  const res = await fetch(API_BASE + path, {
+    ...options,
+    headers: { ...authHeaders(), ...(options.headers || {}) },
+  })
   const data = await res.json().catch(() => ({}))
   if (!res.ok) throw new Error(data.detail || data.error || `요청 실패 (HTTP ${res.status})`)
   return data
@@ -27,9 +32,9 @@ export const composeReport = ({ title, brief, template, includeTable, files = []
 
 // 편집 완료된 내용 → hwpx 파일(Blob) 다운로드.
 export const generateReport = async (payload) => {
-  const res = await fetch('/api/report/generate', {
+  const res = await fetch(API_BASE + '/api/report/generate', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify(payload),
   })
   if (!res.ok) {

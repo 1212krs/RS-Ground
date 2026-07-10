@@ -42,7 +42,8 @@ app = FastAPI(title="RS-Ground RAG API")
 # curl 등으로 API를 직접 두드려볼 때를 위해 열어둔다.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://127.0.0.1:5173", "http://localhost:5173"],
+    allow_origins=config.allowed_origins(),
+    allow_credentials=True,  # 로그인 쿠키를 주고받으려면 필요(배포 시 로그인 단계에서 사용)
     allow_methods=["*"],
     allow_headers=["*"],
 )

@@ -409,3 +409,60 @@ UMAP 단계에서 `TypeError: check_array() got an unexpected keyword argument '
 **다음에 할 것 / 한계:**
 - 업로드 후 "지도가 낡았어요" 배너가 뜨면 사용자가 "새로 만들기"를 눌러야 갱신됨(자동 아님 — UMAP이 무겁기 때문). 나중에 백그라운드 재계산으로 개선 가능.
 - 색상은 출처 파일 기준. `category_l1`(예: 회계) 기준 색칠 옵션을 추가하면 에이전트별 영역이 더 뚜렷해짐.
+
+### 2026-07-10 — 배포 준비 1·2단계: 백엔드 주소 스위치 + CORS 명단 환경변수화
+
+**왜 하나 (개념):**
+- 이 앱을 인터넷에 올리려면 **화면(프론트)**과 **두뇌(백엔드)**를 각각 다른 서비스에 올려야 한다. 계획: 화면=Vercel(무료), 백엔드=Render(파이썬 서버, 영구 디스크 필요). 임베딩·ChromaDB는 Vercel에서 못 돌리기 때문(정적 호스팅).
+- 임베딩 데이터 방침: 원본 문서(`data/raw`, 예: 회계 교재를 텍스트로 변환한 988KB .md)는 이미 git에 있으므로, **무거운 벡터DB(`data/chroma`)나 원본 PDF(242MB)는 옮기지 않고** 서버에서 `python -m rag.pipeline index`로 재색인해 다시 만든다(원본이 작아 비용 미미). 문서를 새로 넣을 때만 재색인, 코드 배포와는 분리.
+
+**무엇을 했나:**
+- **1단계 — 백엔드 주소 스위치**: 프론트가 백엔드를 부를 때 지금은 `/api/...`만 적혀 있어 개발 중엔 Vite 프록시가 localhost:8000으로 연결해준다. 배포되면 그 프록시가 없어 깨진다. 그래서 `src/apiBase.js`(신규)에 `API_BASE = import.meta.env.VITE_API_BASE || ''`를 두고, 백엔드를 부르는 4개 파일(`api.js`·`ragApi.js`·`reportApi.js`·`hooks/useServerState.js`)이 모두 이 값을 앞에 붙이게 했다. 개발에선 빈 값이라 **기존과 동작 동일**, 배포 빌드 때 `VITE_API_BASE`에 Render 주소를 넣으면 그쪽을 본다.
+- **2단계 — CORS 친구 명단 환경변수화**: 브라우저는 "다른 출처(Vercel)에서 온 화면이 다른 출처(Render) 서버에 요청"하는 걸 기본 차단한다(CORS). 백엔드가 Vercel 주소를 허용 명단에 넣어야 한다. 코드에 주소를 박는 대신 `rag/config.py`에 `allowed_origins()`를 추가 — 기본은 localhost:5173, 환경변수 `FRONTEND_ORIGINS`(콤마 구분)에 넣은 주소를 더한다. `rag/api.py`와 `main.py`(RAG 미탑재 fallback 경로) 두 곳의 CORS가 이 함수를 쓰도록 통일하고, 나중 로그인(쿠키) 대비 `allow_credentials=True`도 켰다.
+
+**검증한 내용:**
+- 프론트: `npm run build` 성공 + `npm test` 11개 전부 통과(기존 기능 안 깨짐). `VITE_API_BASE`가 비어 있어 내 PC 동작은 이전과 동일.
+- 백엔드: `allowed_origins()`가 기본값/환경변수 주입값 모두 정확히 반환. `import main`으로 앱 로드 정상(라우트 15개, RAG 포함 기동).
+
+**이어서 3·4단계도 완료(같은 날):**
+- **3단계 — 영구 디스크 대비**: Render는 재배포 시 서버 파일이 초기화되므로 벡터DB가 날아간다. `rag/config.py`의 생성물 경로(chunks·cache·chroma·umap)를 새 `DATA_DIR`(=환경변수 `RSG_DATA_DIR` 또는 기본 `repo/data`) 기준으로 바꿔, 배포 시 영구 디스크(`/var/data`)를 가리키게 함. 원본 `RAW_DOCS_DIR`은 git 원천이라 그대로 repo 안을 본다. 검증: 환경변수 없으면 기존 경로(`data/chroma`) 동일, `RSG_DATA_DIR` 주면 디스크 경로로 전환됨 확인.
+- `render.yaml`(신규, 저장소 루트): Render Blueprint. rootDir=backend, `pip install -r requirements.txt` → `uvicorn main:app`, 비밀키(`ANTHROPIC_API_KEY`·`UPSTAGE_API_KEY`·`FRONTEND_ORIGINS`)는 대시보드 입력(sync:false), `RSG_DATA_DIR=/var/data` + 동일 경로 영구 디스크(1GB). 영구 디스크는 무료 플랜 불가라 plan=starter.
+- `vercel.json`(신규, 루트): react-router 주소 새로고침 시 404 방지용 SPA fallback(`/(.*) → /index.html`).
+- **4단계 — `docs/DEPLOY.md`(신규)**: Render 백엔드 + Vercel 프론트 배포 절차, 환경변수 표, 첫 재색인(`python -m rag.pipeline index`, Render Shell), 이후 개발 흐름(git push=자동배포/문서추가 시만 재색인), 그리고 **로그인 미구현 경고**(배포 전 Vercel 비밀번호 보호 등으로 임시 방어)까지 초보자용으로 정리.
+- 검증: `npm run build` 성공, 백엔드 `import main` 정상(라우트 15), `vercel.json`/`render.yaml` 문법 유효.
+
+**다음에 할 것 (5·6단계):**
+- 5단계: **로그인/잠금** — 현재 로그인은 dev 전용 가짜(`vite.config.js`의 `mockAuth`)라 배포 시 사라진다. 아무나 접속해 Claude 비용을 쓰지 못하게 최소한의 문을 달아야 함(방식 미정 — 사용자 결정 필요).
+- 6단계: GitHub↔Render/Vercel 연결로 실제 배포(=이후 `git push`가 곧 자동배포).
+
+### 2026-07-10 (이어서) — 5단계 로그인: 백엔드 절반(문지기) 구현
+
+**결정:** 사용자가 "사람별 계정(아이디+비번)" 선택. 화면(Vercel)↔백엔드(Render)가 다른 출처라 쿠키 대신 **토큰-헤더 방식**(로그인 시 토큰 발급 → 요청마다 `Authorization: Bearer` 로 지참)을 채택 — local·배포에서 동일하게 동작해 초보자가 다루기 쉽고 CORS 문제도 적음. 공개 회원가입은 두지 않고 **CLI로 계정 생성**(소수 팀 보안).
+
+**무엇을 만들었나 (백엔드, 신규 `backend/auth/` 패키지):**
+- `auth/store.py` — 회원 DB(users)+세션(sessions) SQLite. 비밀번호는 pbkdf2(표준 라이브러리, 무작위 salt, 20만 회)로 해시 저장, 상수시간 비교. DB는 `rag.config.DATA_DIR/app.db`(영구 디스크 대응). 함수: create/list/delete/set_password/authenticate/create_session/user_for_token/destroy_session. **새 패키지 의존성 0**(전부 표준 라이브러리).
+- `auth/api.py` — 라우터(`POST /api/auth/login` {loginId,password}→{user,token}, `POST /api/auth/logout`, `GET /api/auth/me`) + `require_user` 의존성 + **`AuthMiddleware` 문지기**: `/api/rag`·`/api/report`·`/api/store` 요청에 유효 토큰이 없으면 401. `/api/auth/*`와 OPTIONS(프리플라이트)는 통과. 401 응답에도 CORS 헤더를 직접 붙여 브라우저가 내용을 읽게 함.
+- `auth/manage.py` — 계정 관리 CLI: `python -m auth.manage add/list/passwd/delete`. 배포 후 Render Shell에서 팀원 계정 생성.
+- `main.py` — auth 라우터 등록 + `AuthMiddleware` 추가.
+
+**검증(임시 DATA_DIR에서 실서버 기동, 실데이터 미접촉):**
+- CLI로 계정 생성/목록 OK. `authenticate`: 맞는 비번 True, 틀린 비번 False.
+- HTTP 4종: ① 토큰 없이 `/api/store/todos`→401 차단, ② 로그인→토큰 발급, ③ 토큰 지참→200 통과, ④ 틀린 비번 로그인→401. 전부 기대대로.
+
+### 2026-07-10 (이어서) — 5단계 로그인: 프론트 절반(화면 연결) 완료 → 로그인 시스템 완성
+
+**무엇을 했나 (프론트):**
+- `src/apiBase.js`에 출입증(토큰) 보관소 추가: `getToken/setToken/clearToken`(localStorage `rsg_token`) + `authHeaders()`(요청에 붙일 `Authorization: Bearer`). Content-Type은 안 넣어 FormData 업로드를 방해하지 않음.
+- `src/api.js`: `apiLogin`이 백엔드의 `{user, token}`에서 토큰을 보관하고 사용자만 반환. `apiLogout`은 서버 폐기 후 토큰 삭제. `req`가 모든 요청에 `authHeaders()`를 붙이고, 401이면 토큰을 비워 다음 세션 확인 때 로그인 화면으로 유도.
+- 백엔드를 부르는 나머지 3파일(`ragApi.js`·`reportApi.js`·`hooks/useServerState.js`)의 모든 fetch에 `authHeaders()` 병합(GET·PUT·업로드·다운로드 포함). 백엔드가 토큰을 요구하므로 이걸 해야 지식·보고서·워크스페이스가 다시 동작.
+- `vite.config.js`: 가짜 로그인 `mockAuth` 플러그인 **완전 제거**, `server.proxy`에 `/api/auth` 추가(dev에서도 진짜 백엔드 로그인 사용). vitest 설정은 그대로.
+
+**검증:**
+- `npm run build` 성공, `npm test` 11개 전부 통과(테스트는 api.js를 모킹하므로 시그니처 동일해 영향 없음).
+- 실서버(포트 8022, 진짜 `data/app.db`) + CLI로 만든 `admin` 계정으로 전 과정 확인: ① 로그인→토큰+사용자('관리자'), ② 토큰 없이 `/api/store/todos`→401, ③ 토큰 지참→200, ④ `/api/auth/me`→정확한 사용자. 백엔드 `import main` 로그에 "로그인 보호 켜짐" 확인.
+- `docs/DEPLOY.md`의 경고를 "로그인 구현됨 + 배포 후 `auth.manage add`로 계정 생성"으로 갱신.
+
+**개발 워크플로 변경(중요):** 이제 dev에서도 **백엔드를 띄워야** 로그인된다(가짜 로그인 없어짐). 로컬 계정은 `cd backend && python -m auth.manage add <아이디> <비번>`으로 만든다. 이번에 `admin`/`admin1234`(표시이름 관리자)를 로컬 `data/app.db`에 생성해둠 — **비밀번호는 바꾸는 걸 권장**.
+
+**다음에 할 것 (6단계):**
+- GitHub↔Render/Vercel 연결로 실제 배포. 절차는 `docs/DEPLOY.md` 참고. 이후 `git push`가 곧 자동배포.
