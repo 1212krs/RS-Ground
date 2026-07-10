@@ -1,6 +1,6 @@
 import { useNavigate, useOutletContext } from 'react-router-dom'
 import { Menu, MessageSquareText } from 'lucide-react'
-import { AGENTS, UPCOMING_AGENTS } from './agentsConfig.js'
+import { AGENTS, APP_AGENTS, UPCOMING_AGENTS } from './agentsConfig.js'
 import './AgentsPage.css'
 
 // 에이전트 허브 — 분야별 전용 챗(회계챗 등)으로 들어가는 입구.
@@ -23,6 +23,21 @@ export default function AgentsPage() {
       </header>
 
       <div className="ag-grid">
+        {/* 앱형 에이전트: 자기 전용 화면(route)을 여는 도구(예: 회의록 정리). */}
+        {APP_AGENTS.map((a) => {
+          const Icon = a.icon
+          return (
+            <button key={a.id} className="ag-card" onClick={() => navigate(a.route)}>
+              <span className="ag-icon" style={{ background: `${a.accent}22`, color: a.accent }}>
+                <Icon size={22} />
+              </span>
+              <strong>{a.name}</strong>
+              <span className="ag-desc">{a.desc}</span>
+              <span className="ag-open"><MessageSquareText size={13} /> 열기</span>
+            </button>
+          )
+        })}
+
         {/* 전체 검색은 상단 'AI 채팅' 탭에서 제공하므로 여기서는 분야별 에이전트만 노출한다. */}
         {AGENTS.map((a) => {
           const Icon = a.icon

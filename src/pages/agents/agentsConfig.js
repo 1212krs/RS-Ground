@@ -1,4 +1,16 @@
-import { Calculator, ScrollText } from 'lucide-react'
+import { Calculator, ScrollText, ClipboardList } from 'lucide-react'
+
+// 앱형 에이전트: 채팅(scope)이 아니라 자기 전용 화면(route)을 여는 에이전트.
+export const APP_AGENTS = [
+  {
+    id: 'meeting',
+    name: '회의록 정리',
+    route: '/meeting',
+    icon: ClipboardList,
+    accent: '#6C5CE7',
+    desc: '회의 전문을 붙여넣으면 마인드맵·용어 설명·할 일·일정으로 정리합니다.',
+  },
+]
 
 // 에이전트 = (검색 필터 scope) + (성격/소개). 임베딩 창고는 전체가 공유하고,
 // 에이전트마다 scope(category_l1)만 다르게 걸어 '자기 분야 문서'만 검색한다.

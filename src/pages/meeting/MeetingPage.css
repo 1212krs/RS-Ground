@@ -1,0 +1,83 @@
+/* ---- 회의록 정리 (홈/지식과 동일한 다크 배경 컨벤션) ---- */
+.mt { height: 100vh; overflow-y: auto; display: flex; flex-direction: column;
+  background: #0d0d0d; color: #ededed; padding: 22px clamp(20px, 3vw, 40px) 40px; }
+.mt-head { flex: 0 0 auto; display: flex; align-items: center; gap: 16px; margin-bottom: 16px; }
+.mt-head h1 { margin: 0; font-size: 28px; font-weight: 600; letter-spacing: -.02em; }
+.mt-sub { margin: 4px 0 0; color: #8a8a8a; font-size: 12.5px; }
+
+.mt-tabs { display: inline-flex; background: #161616; border: 1px solid #242424; border-radius: 10px; padding: 3px; gap: 2px; margin-bottom: 16px; }
+.mt-tabs button { display: inline-flex; align-items: center; gap: 6px; border: 0; background: transparent; color: #9a9a9a;
+  font-size: 12.5px; font-weight: 600; padding: 8px 14px; border-radius: 8px; cursor: pointer; }
+.mt-tabs button.on { background: #2a2a2a; color: #ededed; }
+
+.mt-card { background: #161616; border: 1px solid #242424; border-radius: 14px; padding: 20px 22px; }
+.mt-label { display: block; font-size: 12.5px; font-weight: 600; color: #cfcfcf; margin: 10px 0 6px; }
+.mt-label:first-child { margin-top: 0; }
+.mt-input, .mt-textarea { width: 100%; box-sizing: border-box; padding: 11px 13px; border-radius: 10px;
+  border: 1px solid #2a2a2a; background: #121212; color: #ededed; font-size: 13px; font-family: inherit; }
+.mt-input:focus, .mt-textarea:focus { outline: none; border-color: #6C5CE7; }
+.mt-textarea { resize: vertical; line-height: 1.6; }
+
+.mt-actions-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px; }
+.mt-hint { color: #7a7a7a; font-size: 12px; }
+.mt-primary { display: inline-flex; align-items: center; gap: 8px; border: 0; border-radius: 10px;
+  background: #6C5CE7; color: #fff; padding: 11px 20px; font-size: 13px; font-weight: 700; cursor: pointer; transition: transform .16s, filter .16s; }
+.mt-primary:hover:not(:disabled) { transform: translateY(-1px); filter: brightness(1.06); }
+.mt-primary:disabled { opacity: .6; cursor: default; }
+
+.mt-empty { color: #6e6e6e; font-size: 13px; margin: 8px 0; }
+
+/* 지난 회의 목록 */
+.mt-list { list-style: none; margin: 0; padding: 0; }
+.mt-list-item { display: flex; align-items: center; gap: 12px; padding: 13px 8px; border-top: 1px solid #202020; cursor: pointer; }
+.mt-list-item:first-child { border-top: 0; }
+.mt-list-item:hover { background: #1b1b1b; border-radius: 8px; }
+.mt-list-item > svg { color: #7a7a7a; flex: 0 0 auto; }
+.mt-list-info { flex: 1; min-width: 0; display: grid; gap: 4px; }
+.mt-list-info strong { font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mt-list-preview { color: #9a9a9a; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mt-list-date { color: #6e6e6e; font-size: 11px; }
+.mt-del { border: 0; background: transparent; color: #7a7a7a; cursor: pointer; padding: 6px; border-radius: 8px; flex: 0 0 auto; }
+.mt-del:hover { background: rgba(239,68,68,.15); color: #EF4444; }
+
+/* 결과 */
+.mt-back { display: inline-flex; align-items: center; gap: 4px; border: 0; background: transparent; color: #9a9a9a; font-size: 12.5px; cursor: pointer; padding: 4px 0; margin-bottom: 8px; }
+.mt-back:hover { color: #ededed; }
+.mt-title { margin: 0 0 6px; font-size: 20px; font-weight: 700; }
+.mt-summary { margin: 0 0 16px; color: #c4c4c4; font-size: 13px; line-height: 1.7; white-space: pre-wrap; }
+
+.mt-mapwrap { display: flex; gap: 14px; margin-bottom: 18px; flex-wrap: wrap; }
+.mt-mapcanvas { flex: 1; min-width: 280px; background: #fafafa; border: 1px solid #e3e3e3; border-radius: 14px; overflow: hidden; }
+.mt-map { width: 100%; height: auto; display: block; }
+.mt-node { cursor: pointer; }
+.mt-node text { pointer-events: none; user-select: none; }
+.mt-node circle { transition: stroke-width .1s, filter .1s; }
+.mt-node:hover circle { filter: brightness(1.05); }
+.mt-term circle { stroke-dasharray: none; }
+
+.mt-panel { flex: 0 0 300px; max-width: 100%; background: #161616; border: 1px solid #242424; border-radius: 14px; padding: 16px 18px; align-self: flex-start; }
+.mt-panel.is-term { border-color: #6C5CE7; }
+.mt-panel strong { display: block; font-size: 14px; margin-bottom: 8px; }
+.mt-panel p { margin: 0; color: #c4c4c4; font-size: 12.5px; line-height: 1.7; }
+.mt-panel-hint { color: #7a7a7a; }
+
+/* 액션/일정 블록 */
+.mt-block { background: #161616; border: 1px solid #242424; border-radius: 14px; padding: 18px 20px; margin-bottom: 14px; }
+.mt-block h3 { display: flex; align-items: center; gap: 7px; margin: 0 0 12px; font-size: 14px; font-weight: 600; }
+.mt-checklist { list-style: none; margin: 0 0 14px; padding: 0; display: grid; gap: 8px; }
+.mt-checklist label { display: flex; align-items: flex-start; gap: 9px; font-size: 13px; line-height: 1.5; cursor: pointer; }
+.mt-checklist input { margin-top: 3px; accent-color: #6C5CE7; flex: 0 0 auto; }
+.mt-meta { color: #8a8a8a; font-size: 11.5px; font-style: normal; }
+.mt-secondary { border: 1px solid #3a3a3a; border-radius: 9px; background: #222; color: #ededed; font-size: 12.5px; font-weight: 600; padding: 9px 15px; cursor: pointer; }
+.mt-secondary:hover:not(:disabled) { background: #2a2a2a; }
+.mt-secondary:disabled { opacity: .55; cursor: default; }
+
+.mt-raw { margin-top: 6px; }
+.mt-raw summary { color: #9a9a9a; font-size: 12.5px; cursor: pointer; }
+.mt-raw pre { margin: 10px 0 0; padding: 14px; background: #121212; border: 1px solid #242424; border-radius: 10px; color: #c4c4c4; font-size: 12px; line-height: 1.7; white-space: pre-wrap; max-height: 340px; overflow-y: auto; }
+
+@media (max-width: 760px) {
+  .mt { height: auto; min-height: 100vh; overflow: visible; }
+  .mt-head h1 { font-size: 24px; }
+  .mt-panel { flex-basis: 100%; }
+}

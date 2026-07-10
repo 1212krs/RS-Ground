@@ -513,3 +513,18 @@ UMAP 단계에서 `TypeError: check_array() got an unexpected keyword argument '
 **설계 요점:** `report/composer.py`의 검증된 방식 재사용(urllib+JSON 스키마 강제, 의존성 0), `claude-sonnet-5`, `app.db`에 `meetings` 표 신규(영구 디스크), 새 API `POST/GET/DELETE /api/meeting*`. **주의: `auth/api.py`의 `PROTECTED_PREFIXES`에 `/api/meeting` 추가 필수**(안 하면 비로그인 Claude 호출 구멍). 전문 최대 3만 자 제한. 구현은 PRD 7장 순서(백엔드→뼈대→SVG→할일 연동→목록→검증)로 진행 예정 — 아직 미구현.
 
 **범위 확장(같은 날, 사용자 확정):** 확장 아이디어 ①~⑥을 범위에 포함하되 **3차수로 분할** — 1차(코어+①일정 연동: 분석 JSON에 `schedule_items`, 할일과 같은 패턴으로 캘린더 추가), 2차(②회의챗=전문 통째 컨텍스트 질문, ③hwpx 회의록 다운로드=report 엔진 재사용), 3차(④시리즈별 액션 진행 추적, ⑤용어집 누적, ⑥마인드맵 PNG 저장). ⑦RAG 색인·⑧참석자별 보기는 나중 검토로 보류. 각 차수 완료 시 배포하고 다음 차수 진행("기능 하나씩" 원칙 유지). PRD-Meeting.md 2·3·6·7장 갱신.
+
+### 2026-07-10 (이어서) — 회의록 정리 에이전트 1차(코어) 구현
+
+**무엇을 만들었나:**
+- **백엔드 신규 `backend/meeting/`**: `analyzer.py`(Claude 호출, `output_config.format`으로 JSON 스키마 강제 — 마인드맵은 재귀 미지원 대응해 중심→가지→세부 3단계로 못박음, `claude-sonnet-5`, 전문 3만 자 제한, 키 없음/오류 시 RuntimeError·fallback 없음), `store.py`(`meetings` 표, `config.DATA_DIR/app.db`=영구 디스크, 분석 JSON 통째 저장→재조회 시 Claude 재호출 0), `api.py`(`POST /api/meeting/analyze`, `GET /api/meeting`, `GET/DELETE /api/meeting/{id}`). `main.py`에 라우터 연결, **`auth/api.py`의 `PROTECTED_PREFIXES`에 `/api/meeting` 추가**(비로그인 Claude 호출 차단).
+- **프론트 신규**: `meetingApi.js`(analyze/list/get/remove + `appendToStore`로 할일·일정 추가), `pages/meeting/MeetingPage.jsx`(새 분석 폼 / 지난 회의 목록 / 결과 화면 — 마인드맵+요약+노드 클릭 설명 패널+액션/일정 체크박스 선택 추가+원문 접기), `MindMap.jsx`(순수 SVG 방사형 3단계, 노드 클릭→설명, 용어=진한 테두리), `MeetingPage.css`(다크 페이지+밝은 맵 캔버스). `App.jsx` `/meeting` 라우트, `AppLayout` NO_TOPBAR에 추가, `agentsConfig.js` `APP_AGENTS`(앱형=route) + `AgentsPage`에 카드.
+- **① 일정 연동**: 분석 JSON `schedule_items`(구체적 날짜만) → 선택 시 `/api/store/events`에 append(할일은 `/api/store/todos`). 워크스페이스 데이터 모양(todo/event) 그대로 맞춤.
+
+**검증:**
+- 프론트 `npm run build` 성공(MeetingPage 청크 생성) + `npm test` 11개 통과.
+- 백엔드 `import main` 정상, 회의 라우트 3경로 등록 + `/api/meeting` 문지기 보호 확인.
+- `ANALYSIS_SCHEMA` 오프라인 검증: JSON 직렬화 OK, 금지 요소(재귀/길이·수치 제약) 없음, 모든 object가 `additionalProperties:false`+`required==properties`, 마인드맵 3단계 고정.
+- ⚠️ **실제 Claude 분석은 로컬에서 미검증**: 로컬 `backend/.env`의 ANTHROPIC_API_KEY가 재발급 전 옛 키라 401(코드는 정상 — 요청이 인증까지 도달, 오류 처리 정상). **배포 서버(유효 키)에서 end-to-end 테스트 예정.**
+
+**다음:** 배포(git push) → 배포 서버에서 admin 로그인 후 실제 회의록 분석 테스트 → 이상 없으면 1차 완료. (2차: ②회의챗 ③hwpx)
