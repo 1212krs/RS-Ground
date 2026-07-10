@@ -503,3 +503,11 @@ UMAP 단계에서 `TypeError: check_array() got an unexpected keyword argument '
 **검증:** 백엔드 `import main` 정상(라우트 16, umap 라우트 없음), `python -m rag.pipeline index` 실제 실행 1097청크 저장 exit 0. 프론트 `npm run build` 성공 + `npm test` 11개 통과.
 
 **재색인 명령 변경:** 이제 `python -m rag.pipeline index` (더 이상 `--no-viz` 불필요).
+
+### 2026-07-10 (이어서) — 회의록 정리 에이전트 PRD 작성
+
+**무엇:** 새 에이전트 기획 문서 [docs/PRD-Meeting.md](docs/PRD-Meeting.md) 작성. 회의 전문(텍스트 붙여넣기)을 Claude 1회 호출로 분석해 ① 마인드맵 다이어그램(순수 SVG, 3단계) ② 용어 쉬운 설명(클릭 시 즉시 표시 — 분석 때 미리 전부 생성) ③ 액션 아이템(선택한 것만 워크스페이스 '할 일'로 추가, `[회의]` 접두어)을 만드는 에이전트.
+
+**사용자 결정(2026-07-10):** STT(음성) 제외(비용), 액션 아이템=할 일 연동, 회의록 서버 저장+목록 다시 보기(재분석 비용 0), 용어 설명은 분석 시 일괄 생성(호출 1번).
+
+**설계 요점:** `report/composer.py`의 검증된 방식 재사용(urllib+JSON 스키마 강제, 의존성 0), `claude-sonnet-5`, `app.db`에 `meetings` 표 신규(영구 디스크), 새 API `POST/GET/DELETE /api/meeting*`. **주의: `auth/api.py`의 `PROTECTED_PREFIXES`에 `/api/meeting` 추가 필수**(안 하면 비로그인 Claude 호출 구멍). 전문 최대 3만 자 제한. 구현은 PRD 7장 순서(백엔드→뼈대→SVG→할일 연동→목록→검증)로 진행 예정 — 아직 미구현.
