@@ -78,8 +78,7 @@ src/
   pages/
     login/LoginPage.jsx            랜딩 히어로 + 로그인 폼 (내부 state로 전환, 별도 라우트 아님)
     dashboard/DashboardPage.jsx    홈(캘린더/할 일/메모) — 실제 완성된 보호 페이지
-    knowledge/KnowledgePage.jsx    지식 탭 — 문서 업로드(.txt/.md/.pdf/.docx/.hwpx) + 임베딩 색인 + 색인된 문서 목록 + [목록/지도] 토글(EmbeddingMap.jsx, UMAP 산점도) (2026-07-07 추가, 지도 2026-07-08 추가)
-    knowledge/EmbeddingMap.jsx     임베딩 지도 — UMAP 2D 좌표를 순수 SVG 산점도로(외부 차트 라이브러리 없음). 색=출처 파일, 범례 토글, 점 hover 미리보기 (2026-07-08 추가)
+    knowledge/KnowledgePage.jsx    지식 탭 — 문서 업로드(.txt/.md/.pdf/.docx/.hwpx) + 임베딩 색인 + 색인된 문서 목록 (2026-07-07 추가). 임베딩 지도(UMAP)는 2026-07-10 제거됨.
     reports/ReportsPage.jsx        보고서 탭 — 서식 선택 → 제목·내용·참고파일로 AI 본문 생성 → 섹션 편집·미리보기 → hwpx 다운로드 (2026-07-08 추가)
     chat/ChatPage.jsx              AI 채팅/회계챗 — 근거 기반 질의응답 (2026-07-08 추가). URL 파라미터 ?scope=회계 로 검색 분야를 걸어 회계챗/AI챗을 겸함(전체=필터 없음).
     agents/AgentsPage.jsx          에이전트 허브 — 분야별 전용 챗 카드(회계챗 등). agentsConfig.js가 에이전트 목록(=데이터). 카드 클릭 시 /chat?scope=... 로 이동 (2026-07-08 추가).
@@ -87,12 +86,13 @@ src/
     not-found/NotFoundPage.jsx     알 수 없는 주소(`*`) 처리
   hooks/useStoredState.js          localStorage 동기화 state 훅
   test/setup.js                   vitest용 jest-dom matcher 등록
-vite.config.js                    react() + mockAuth()(dev 전용 가짜 인증) + /api/rag 프록시(→127.0.0.1:8000) + vitest 설정
+vite.config.js                    react() + /api/{auth,rag,report,store} 프록시(→127.0.0.1:8000) + vitest 설정 (mockAuth는 2026-07-10 진짜 로그인으로 대체·제거)
 backend/
   main.py                         통합 진입점 — rag 앱에 보고서 라우터를 합쳐 한 서버로 띄움 (2026-07-08 추가). 실행 명령은 3장 참고.
-  rag/api.py                      RAG용 FastAPI 서버. POST/GET /api/rag/documents (업로드 시 전체 재색인), POST /api/rag/chat (근거 기반 질의응답), GET/POST /api/rag/umap (임베딩 지도 좌표 조회/재계산).
+  rag/api.py                      RAG용 FastAPI 서버. POST/GET /api/rag/documents (업로드 시 전체 재색인), POST /api/rag/chat (근거 기반 질의응답). (umap 엔드포인트는 2026-07-10 제거)
   rag/chat.py                     질의응답 엔진 (2026-07-08 추가) — 질문 임베딩→store.query(카테고리 필터)→Claude(claude-sonnet-5, urllib) 근거 기반 답변. 키 없으면 근거만 반환(fallback).
-  rag/visualize.py                UMAP 2D 축소 + 좌표 저장/로드(umap_coords.json) + Plotly HTML. api.py의 POST /api/rag/umap이 여기 함수를 지연 import해 씀(umap-learn이 무거워 서버 시작을 늦추지 않도록).
+  auth/                           로그인 시스템 (2026-07-10 추가) — store.py(SQLite users/sessions, pbkdf2), api.py(login/logout/me + AuthMiddleware 문지기 + require_user), manage.py(계정 CLI). 토큰-헤더 방식.
+  security.py                     보안 하드닝 (2026-07-10, 외부 커밋) — TrustedHostMiddleware(RSG_ALLOWED_HOSTS), body 크기 제한, 보안 헤더, 입력 검증.
   report/                         보고서 생성 패키지 (2026-07-08 추가) — engine.py(hwpx 마커 치환·조립, 표준 라이브러리만),
                                   composer.py(Claude API urllib 직접 호출 + 대체 생성기 + 지침 3계층),
                                   extractors.py(참고파일 텍스트 추출 — txt/md/csv/hwp/hwpx/docx, .hwp OLE 파서 자체 구현),
@@ -125,7 +125,7 @@ backend/
 
 ## 6. 중요한 한계 / 미구현 (사실 기반)
 
-- **인증용 진짜 백엔드는 여전히 없다.** DB, 실제 인증 미구현. `vite.config.js`의 `mockAuth()`는 비밀번호를 검사하지 않는 개발용 임시 장치이며 실제 보안이 아니다. (RAG용 FastAPI 서버(`backend/rag/api.py`)는 별개로 실제 동작함 — 7장 참고. 이 서버엔 인증이 전혀 없어서 로컬 개발 전용이고, 외부에 노출하면 안 됨.)
+- **인증은 2026-07-10부터 진짜다.** `backend/auth/`가 아이디+비번(사람별 계정, pbkdf2 해시)으로 검사하고 토큰을 발급하며, `AuthMiddleware`가 `/api/rag`·`/api/report`·`/api/store`를 토큰 없이는 401로 막는다. 공개 회원가입은 없고 계정은 `auth.manage add` CLI로 만든다. (옛 `mockAuth`는 제거됨.) **배포 주의**: 보안 미들웨어가 `RSG_ALLOWED_HOSTS`(응답 허용 도메인)를 요구 — 미설정 시 모든 요청 400. 계정 자체가 없으면 아무도 못 들어간다.
 - 일정/할 일(전체 화면)/메모(전체 화면)/설정 — 아직 `ComingSoonPage` 자리표시자만 있고 실제 화면 없음. (지식 탭 2026-07-07, 보고서·AI채팅·에이전트 탭 2026-07-08부터 실제 동작함.)
 - AI 채팅/에이전트(회계챗)는 지식 탭에 올린 문서를 근거로만 답한다. 답변 생성엔 `ANTHROPIC_API_KEY` 필요(없으면 근거 조각만 보여주는 fallback). 대화 기록은 저장되지 않음(새로고침 시 초기화), 답변 마크다운은 아직 서식 렌더링 없이 줄바꿈만 보존.
 - 문서 업로드는 `.txt`/`.md`/`.pdf`/`.docx`/`.hwpx` 가능(2026-07-07 확장). XLSX, 옛 바이너리 `.hwp`(구버전, hwpx 아님), 이미지 기반 스캔 PDF(OCR 필요)는 아직 미지원.
@@ -141,12 +141,12 @@ backend/
 
 사용자가 RAG(문서 검색 기반) 기능을 다음 작업으로 결정. 설계 검토를 거쳐 **[docs/PRD-RAG.md](docs/PRD-RAG.md)** 에 상세 요구사항을 확정하고, 이어서 `backend/rag/`에 실제 코드를 구현함. 핵심 사항:
 
-- **스택**: 업스테이지 임베딩 API(이원 모델 — 문서는 `embedding-passage`, 질문은 `embedding-query`, 4096차원) + ChromaDB(로컬 영속, **컬렉션 생성 시 cosine 지정 필수 — 생성 후 변경 불가**) + UMAP(`random_state` 고정, `metric="cosine"`) + Plotly(HTML 산점도).
-- **형태**: `backend/rag/` 핵심 로직(청킹/임베딩/저장/시각화) + `backend/rag/api.py`(FastAPI, 지식 탭 연동용) + `backend/rag/pipeline.py`(CLI, 배치 색인·검색용). 둘 다 같은 핵심 함수를 재사용.
-- **React 연동(2026-07-07 완료)**: 지식 탭(`/knowledge`, `KnowledgePage.jsx`)에서 문서 업로드 → `ragApi.js` → Vite 프록시(`/api/rag` → `127.0.0.1:8000`) → `rag/api.py`가 파일 저장 후 `data/raw/` 전체를 재색인(청킹→임베딩→ChromaDB reset+upsert). 업로드 폼에 대/중/소분류 선택 입력 필드 있음(비우면 미분류). 목록 조회(`GET /api/rag/documents`)는 ChromaDB 메타데이터를 source별로 집계해서 반환. **UMAP 시각화는 API에 포함 안 함**(느리고 지식 탭에서 필요 없음 — 필요하면 여전히 CLI `pipeline index`로 생성).
+- **스택**: 업스테이지 임베딩 API(이원 모델 — 문서는 `embedding-passage`, 질문은 `embedding-query`, 4096차원) + ChromaDB(로컬 영속, **컬렉션 생성 시 cosine 지정 필수 — 생성 후 변경 불가**). (UMAP/Plotly 시각화는 2026-07-10 제거.)
+- **형태**: `backend/rag/` 핵심 로직(청킹/임베딩/저장) + `backend/rag/api.py`(FastAPI, 지식 탭 연동용) + `backend/rag/pipeline.py`(CLI, 배치 색인·검색용). 둘 다 같은 핵심 함수를 재사용.
+- **React 연동(2026-07-07 완료)**: 지식 탭(`/knowledge`, `KnowledgePage.jsx`)에서 문서 업로드 → `ragApi.js` → Vite 프록시(`/api/rag` → `127.0.0.1:8000`) → `rag/api.py`가 파일 저장 후 `data/raw/` 전체를 재색인(청킹→임베딩→ChromaDB reset+upsert). 업로드 폼에 대/중/소분류 선택 입력 필드 있음(비우면 미분류). 목록 조회(`GET /api/rag/documents`)는 ChromaDB 메타데이터를 source별로 집계해서 반환. (재색인은 메모리 절약을 위해 배치 200개씩 임베딩→저장한다.)
 - **문서 형식 확장(2026-07-07)**: `backend/rag/extractors.py` 신규 — `.txt`/`.md`는 그대로 읽고, `.pdf`(pdfplumber)·`.docx`(python-docx)·`.hwpx`(zip+XML 직접 파싱, OWPML `hp:p`/`hp:t` 태그를 문단 단위로 재구성)에서 텍스트를 추출해 동일한 청킹 파이프라인에 태움. **HWPX는 외부 프로그램(한글) 의존 없이 순수 Python으로 파싱** — 서버에서 안정적으로 돌아가게 하려고 COM 자동화 대신 이 방식을 선택. 이 컴퓨터에 설치된 한글 프로그램으로 실제 HWPX/DOCX/PDF 샘플을 만들어 각각 추출 결과를 검증(문단 구분·한글 내용 정확히 보존 확인), CLI 파이프라인과 업로드 API 양쪽에서 실제 파일로 재검증 완료. **미지원**: XLSX, 옛 바이너리 `.hwp`(hwpx 아님), 스캔 이미지 PDF(OCR 없음).
 - **실행 환경**: `backend/venv`(Python 3.11.9, pyenv), 의존성은 `backend/requirements.txt`에 버전 고정. 실행: `cd backend && ./venv/Scripts/python.exe -m rag.pipeline index` (색인) / `... rag.pipeline search "질문"` (검색).
-- **코드 구조**: `config.py`(설정) · `chunker.py`(문단 우선 청킹 + 메타데이터, 폴더 계층을 `category_l1/l2/l3`로 자동 추출) · `embedder.py`(업스테이지 API + SQLite 캐시, `embed_passages`/`embed_query` 분리) · `store.py`(ChromaDB, cosine, `{source}::{chunk_index}` 결정적 ID + upsert, 분류 `where` 필터) · `visualize.py`(UMAP+Plotly) · `pipeline.py`(CLI, `search --l1/--l2/--l3`로 분류 필터링).
+- **코드 구조**: `config.py`(설정) · `chunker.py`(문단 우선 청킹 + 메타데이터, 폴더 계층을 `category_l1/l2/l3`로 자동 추출) · `embedder.py`(업스테이지 API + SQLite 캐시, `embed_passages`/`embed_query` 분리) · `store.py`(ChromaDB, cosine, `{source}::{chunk_index}` 결정적 ID + upsert, 분류 `where` 필터) · `pipeline.py`(CLI, 배치 색인 + `search --l1/--l2/--l3`로 분류 필터링).
 - **문서 분류 원칙(2026-07-07 결정)**: 문서를 미리 손으로 분류하지 않는다 — 성격이 다른 문서는 임베딩 거리로 자동 분리됨. 대신 `data/raw/` 밑에 **폴더 계층으로만 자연스럽게 정리**(예: `기술/AI/AI챗봇/기획서.md`)하면 `chunker.py`가 상위 3단계를 자동으로 대/중/소분류 메타데이터로 뽑아 나중에 검색 필터링(`--l1/--l2/--l3`)에 쓸 수 있음. 상세: [docs/PRD-RAG.md](docs/PRD-RAG.md) 4.1절.
 - **초기 테스트 문서**: 실제 문서가 없어 프로젝트 자체 문서(AGENT.md/DEVLOG.md/PRD-RAG.md)를 `data/raw/`에 복사해 사용 — 나중에 실제 문서로 교체 가능.
 - **재색인 안전성**: `run_index()`는 매번 `reset_collection()`으로 ChromaDB 컬렉션을 통째로 비우고 다시 채운다 — 문서가 삭제·축소돼도 오래된 청크가 안 남게 하기 위함(source별 부분 삭제 대신 전체 리셋을 선택; 임베딩은 SQLite 캐시가 막아줘서 API 비용 증가 없음). `chunker.py`의 `_split_long_paragraph`는 문장 분할 후에도 남는 초과분을 고정 길이로 강제 분할하는 하드 스플릿 안전장치가 있어 마침표 없는 표/URL/코드블록도 chunk_size를 크게 벗어나지 않음(오버랩만큼의 소폭 초과는 의도된 허용치).
@@ -176,6 +176,7 @@ backend/
 
 ## 9. 변경 이력 (AGENT.md 자체)
 
+- 2026-07-10: **인터넷 배포 완료 + 관련 수정.** 백엔드 Render(`rs-ground-api.onrender.com`, Starter/영구디스크 `/var/data`), 프론트 Vercel(`rs-ground.vercel.app`). 배포하며 나온 이슈들 해결: ① 워크스페이스 저장 DB(`store/api.py`)를 하드코딩 경로→`config.DATA_DIR/app.db`로 바꿔 영구 디스크에 저장(재배포에도 일정·할 일·메모 유지, auth와 같은 파일). ② **보안 하드닝**(별도 커밋 `Apply backend security hardening`, 외부 작업): `backend/security.py` 추가 — `TrustedHostMiddleware`(허용 호스트 env `RSG_ALLOWED_HOSTS`, **미설정 시 모든 요청 400** 주의), body 크기 제한, 보안 헤더, 입력 길이 검증, 세션 토큰 해시·TTL(`RSG_SESSION_TTL_DAYS`). ③ **임베딩 지도(UMAP) 기능 제거** — 512MB에서 UMAP 계산이 OOM(특히 실행 중 `POST /api/rag/umap`는 서버 다운 위험). 프론트 `EmbeddingMap.jsx`·지도 UI, 백엔드 umap 엔드포인트·`visualize.py`·config의 UMAP/VIZ 경로, `requirements`의 umap-learn/scikit-learn/plotly 삭제. 지식 탭은 문서 목록만. ④ 색인을 배치(200개)로 나눠 처리해 메모리 절감(`rag.pipeline`). 배포 환경변수: Render=`ANTHROPIC_API_KEY`/`UPSTAGE_API_KEY`/`FRONTEND_ORIGINS`/`RSG_ALLOWED_HOSTS`/`RSG_DATA_DIR`, Vercel=`VITE_API_BASE`. 상세 절차는 `docs/DEPLOY.md`.
 - 2026-07-10: **배포 준비 5단계 — 로그인 완성.** 사람별 계정(아이디+비번) 로그인 구현. 백엔드 신규 `backend/auth/`(store=SQLite users/sessions + pbkdf2 해시, api=login/logout/me 라우터 + `AuthMiddleware` 문지기 + `require_user`, manage=계정 CLI, 의존성 0). `main.py`에 라우터·미들웨어 연결. 프론트: `apiBase.js`에 토큰 보관/`authHeaders()` 추가, `api.js`가 로그인 시 토큰 저장·요청마다 지참·401 시 토큰 삭제, 나머지 3 api 파일 fetch에 토큰 병합, `vite.config.js` mockAuth 제거+`/api/auth` 프록시. 쿠키 대신 토큰-헤더(다른 출처 대응). 검증: build/test(11) 통과 + 실서버·실계정(admin) end-to-end(로그인→토큰→보호 API 200, 무토큰 401). DEPLOY.md 경고 갱신. 상세 DEVLOG 2026-07-10. **다음: 6단계 실제 배포.**
 - 2026-07-10: **배포 준비 1·2단계(진행 중).** 인터넷 배포 계획 수립 — 화면=Vercel, 백엔드=Render(영구 디스크). 임베딩 데이터는 옮기지 않고 서버에서 `python -m rag.pipeline index`로 재색인(원본 `data/raw`만 git에 있고 작음). ① 프론트 백엔드 주소를 `src/apiBase.js`의 `API_BASE`(=`import.meta.env.VITE_API_BASE`)로 스위치화, `/api`를 부르는 4파일이 이를 앞에 붙임(dev에선 빈 값이라 기존과 동일). ② CORS 허용 목록을 `rag/config.py`의 `allowed_origins()`로 통일 — 기본 localhost + 환경변수 `FRONTEND_ORIGINS`. `allow_credentials=True` 추가. 검증: `npm run build`/`npm test`(11개) 통과, 백엔드 앱 로드 정상. **남은 단계**: 3=render.yaml+영구디스크, 4=docs/DEPLOY.md, 5=로그인(현재 `mockAuth`는 dev 전용→배포 시 사라짐, 최소 잠금 필요), 6=GitHub 연결 자동배포. 상세는 DEVLOG 2026-07-10 참고.
 - 2026-07-08: **보고서 탭 실제 구현.** `backend/report/` 패키지 신규(hwpx 조립 엔진 + Claude API 본문 생성 + 참고파일 추출 + FastAPI 라우터, 전부 표준 라이브러리 — 의존성 추가 없음), `backend/main.py`(rag+report 통합 진입점, 실행 명령 `uvicorn main:app`으로 변경), 프론트 `ReportsPage.jsx`+`reportApi.js` 추가, `/reports` 라우트·다크 배경·`/api/report` 프록시 연결. 서식은 "hwpx+지침 md 세트" 규약(`backend/report/templates/`), 지침은 3계층(기본<공통<서식)으로 AI 프롬프트에 주입. 엔진은 업무 PC에서 오프라인 검증 완료, FastAPI 실행 검증은 개발 PC 몫. `검토보고서.hwpx`는 업무 PC DRM 감염으로 이번에 제외(지침 md만 포함 — DRM 없는 hwpx를 templates에 넣으면 자동 등록).

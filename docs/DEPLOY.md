@@ -21,7 +21,7 @@
  Vercel (무료)                       Render (유료 소액, 영구 디스크)
  React 정적 빌드                     FastAPI + ChromaDB(벡터DB)
  env: VITE_API_BASE                  env: ANTHROPIC_API_KEY, UPSTAGE_API_KEY,
-                                          FRONTEND_ORIGINS, RSG_DATA_DIR
+                                          FRONTEND_ORIGINS, RSG_ALLOWED_HOSTS, RSG_DATA_DIR
 ```
 
 - **화면(Vercel)**: 그냥 HTML/JS 파일 덩어리라 무료로 올린다.
@@ -49,6 +49,9 @@
    - `FRONTEND_ORIGINS` = 아직 비워둠 (4번에서 Vercel 주소가 정해지면 채운다)
 4. 배포를 시작하면 라이브러리 설치(chromadb 등, 몇 분 소요) 후 서버가 뜬다.
    배포 주소가 생긴다. 예: `https://rs-ground-api.onrender.com` → 이 주소를 적어둔다.
+   - ⚠️ **곧바로 `RSG_ALLOWED_HOSTS`도 입력**한다: 이 주소의 **호스트만**(예:
+     `rs-ground-api.onrender.com`, `https://`·`/` 없이). 이 값이 없으면 보안 미들웨어
+     (TrustedHostMiddleware)가 **모든 요청을 400으로 막아** 로그인조차 안 된다. Save→재배포.
 5. **첫 재색인(벡터DB 만들기)** — 이 시점의 서버에는 아직 벡터DB가 비어 있다. 원본 문서(`data/raw`,
    git에 포함됨)로 벡터DB를 만들어야 한다. Render 서비스의 **Shell** 탭에서 한 번 실행:
    ```bash
@@ -111,17 +114,28 @@
 | `ANTHROPIC_API_KEY` | Render | Claude 키(채팅·보고서) | `sk-ant-...` |
 | `UPSTAGE_API_KEY` | Render | 임베딩 키(재색인용) | `up_...` |
 | `FRONTEND_ORIGINS` | Render | CORS 허용할 프론트 주소 | `https://rs-ground.vercel.app` |
+| `RSG_ALLOWED_HOSTS` | Render | **응답할 호스트(도메인)**. 없으면 모든 요청 400 | `rs-ground-api.onrender.com` |
 | `RSG_DATA_DIR` | Render | 생성 데이터 저장 경로(영구 디스크) | `/var/data` (render.yaml에 이미 지정됨) |
 | `PYTHON_VERSION` | Render | 파이썬 버전 | `3.11.9` (render.yaml에 이미 지정됨) |
 | `VITE_API_BASE` | Vercel | 프론트가 부를 백엔드 주소 | `https://rs-ground-api.onrender.com` |
+
+> 참고: `RSG_ALLOWED_HOSTS`(응답할 도메인)와 `FRONTEND_ORIGINS`(CORS 허용 출처)는 다른 것이다.
+> 전자는 "이 주소로 온 요청에 답한다", 후자는 "이 화면(브라우저)의 요청을 허용한다". 둘 다 필요하다.
 
 로컬(내 PC) 개발에서는 위 배포용 변수들이 **없어도** 지금까지와 똑같이 동작한다
 (백엔드는 `backend/.env`의 API 키만 사용).
 
 ---
 
-## 8. 남은 일 (로드맵)
+## 8. 현재 상태 / 운영 메모
 
-- **6단계 — 실제 배포**: 위 3~5절을 실제로 수행(Render·Vercel 계정 연결, 환경변수 입력, 첫 재색인, 계정 생성).
-  한 번 연결하면 이후 `git push`가 곧 자동배포다.
-- 세부 진행 기록은 `DEVLOG.md`(2026-07-10 항목)와 `AGENT.md` 참고.
+- **배포 완료(2026-07-10):** 백엔드(Render, `https://rs-ground-api.onrender.com`) + 프론트(Vercel,
+  `https://rs-ground.vercel.app`) 연결·로그인·재색인까지 동작. 이후 `git push`가 곧 자동배포.
+- **임베딩 지도(UMAP) 기능은 제거됨** — Render Starter(512MB) 메모리로는 UMAP 계산이 OOM을
+  내서 뺐다. 지식 탭은 문서 목록만 보여준다. 채팅·검색·보고서·워크스페이스는 영향 없음.
+- **메모리 주의:** 512MB에서는 무거운 계산(대량 임베딩 등)이 OOM을 낼 수 있다. 재색인은 배치로
+  나눠 처리하도록 되어 있어 현재 문서량은 문제없다. 문서가 크게 늘면 인스턴스 메모리 상향 고려.
+- **AI 답변(Claude) 문제 시:** 채팅이 "근거만" 나오면 `ANTHROPIC_API_KEY`가 백엔드에 제대로
+  전달됐는지 확인. Render **Logs**에 `[chat] LLM 미사용(...)` 줄로 실패 원인이 찍힌다
+  (HTTP 401=키 오류, HTTP 404=모델 이름 문제 등).
+- 세부 진행 기록은 `DEVLOG.md`(2026-07-10 항목들)와 `AGENT.md` 참고.
