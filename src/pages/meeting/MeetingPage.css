@@ -46,18 +46,9 @@
 .mt-title { margin: 0 0 6px; font-size: 20px; font-weight: 700; }
 .mt-summary { margin: 0 0 16px; color: #c4c4c4; font-size: 13px; line-height: 1.7; white-space: pre-wrap; }
 
-.mt-mapwrap { display: flex; gap: 14px; margin-bottom: 18px; flex-wrap: wrap; }
-.mt-mapcanvas { flex: 1; min-width: 280px; background: #050505; border: 1px solid #242424; border-radius: 14px; overflow: hidden; }
+.mt-mapcanvas { background: #050505; border: 1px solid #242424; border-radius: 14px; overflow: hidden; margin-bottom: 18px; }
 .mt-map { width: 100%; height: auto; display: block; }
-.mt-node { cursor: pointer; }
 .mt-node text { pointer-events: none; user-select: none; }
-.mt-node rect, .mt-node circle { transition: stroke-width .1s, filter .1s; }
-.mt-node:hover rect, .mt-node:hover circle { filter: brightness(1.15); }
-
-.mt-panel { flex: 0 0 300px; max-width: 100%; background: #161616; border: 1px solid #242424; border-radius: 14px; padding: 16px 18px; align-self: flex-start; }
-.mt-panel strong { display: block; font-size: 14px; margin-bottom: 8px; }
-.mt-panel p { margin: 0; color: #c4c4c4; font-size: 12.5px; line-height: 1.7; white-space: pre-wrap; }
-.mt-panel-hint { color: #7a7a7a; }
 
 /* 액션/일정/용어 블록 */
 .mt-block { background: #161616; border: 1px solid #242424; border-radius: 14px; padding: 18px 20px; margin-bottom: 14px; }
@@ -87,5 +78,4 @@
 @media (max-width: 760px) {
   .mt { height: auto; min-height: 100vh; overflow: visible; }
   .mt-head h1 { font-size: 24px; }
-  .mt-panel { flex-basis: 100%; }
 }

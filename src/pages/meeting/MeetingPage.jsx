@@ -20,7 +20,6 @@ export default function MeetingPage() {
 
   // 결과
   const [result, setResult] = useState(null)     // { id, analysis }
-  const [selected, setSelected] = useState(null) // 클릭한 노드
   const [checkedActions, setCheckedActions] = useState(() => new Set())
   const [checkedSchedule, setCheckedSchedule] = useState(() => new Set())
   const [addedActions, setAddedActions] = useState(false)
@@ -46,7 +45,6 @@ export default function MeetingPage() {
 
   const openResult = (data, from) => {
     setResult(data)
-    setSelected(null)
     setCheckedActions(new Set())
     setCheckedSchedule(new Set())
     setAddedActions(false)
@@ -139,21 +137,6 @@ export default function MeetingPage() {
     }
   }
 
-  // 선택한 노드에 대해 보여줄 설명. 용어 설명은 별도 섹션에 있으므로 여기서는 회의 내용만 다룬다.
-  const selectedInfo = () => {
-    if (!selected) return null
-    const a = result?.analysis
-    if (selected.kind === 'center') return { head: selected.label, body: a?.summary || '회의의 중심 주제입니다.' }
-    if (selected.kind === 'branch') {
-      const body = selected.children?.length
-        ? selected.children.map((c) => `• ${c}`).join('\n')
-        : '이 안건에는 세부 항목이 없습니다.'
-      return { head: selected.label, body }
-    }
-    return { head: selected.label, body: '이 안건에서 논의된 세부 내용입니다.' }
-  }
-  const info = selectedInfo()
-
   return (
     <div className="mt">
       <header className="mt-head">
@@ -225,20 +208,8 @@ export default function MeetingPage() {
           <h2 className="mt-title">{result.analysis.title}</h2>
           {result.analysis.summary && <p className="mt-summary">{result.analysis.summary}</p>}
 
-          <div className="mt-mapwrap">
-            <div className="mt-mapcanvas">
-              <MindMap mindmap={result.analysis.mindmap} selected={selected} onSelect={setSelected} />
-            </div>
-            <aside className="mt-panel">
-              {info ? (
-                <>
-                  <strong>{info.head}</strong>
-                  <p>{info.body}</p>
-                </>
-              ) : (
-                <p className="mt-panel-hint">노드를 클릭하면 설명이 여기 나와요. 전문 용어는 아래 '용어 설명'에서 따로 확인하세요.</p>
-              )}
-            </aside>
+          <div className="mt-mapcanvas">
+            <MindMap mindmap={result.analysis.mindmap} />
           </div>
 
           {/* 용어 설명 (마인드맵과 분리된 부가 정보) */}

@@ -2,8 +2,8 @@
 // 외부 차트 라이브러리를 쓰지 않는다(프로젝트 원칙). viewBox 기반이라 화면 크기에 맞춰 자동 축소.
 // 레이아웃: 중심을 가운데 두고 가지를 좌/우로 나눠 배치, 각 가지의 세부 항목은
 // 옆으로 뻗는 대괄호(스파인) 형태로 나열한다 — 방사형보다 텍스트가 잘리지 않고 읽기 쉽다.
-// 노드 클릭 시 onSelect(node)로 알려서 부모가 설명 패널을 띄운다. 용어 설명은 별도 목록(용어 설명 섹션)에서
-// 다루므로 이 지도에는 회의 내용(중심·가지·세부)만 그린다.
+// 세부 항목까지 도표에 전부 풀어서 보여주므로 별도 클릭 설명 패널은 두지 않는다.
+// 용어 설명은 별도 목록(용어 설명 섹션)에서 다루므로 이 지도에는 회의 내용(중심·가지·세부)만 그린다.
 
 // 앱 공통 브랜드 5색(가지별로 순환) + 중심 전용 빨강. 검정 캔버스 위에서 잘 보이도록 고른 팔레트.
 const BRANCH_COLORS = ['#6C5CE7', '#1FA25A', '#E8871E', '#F2B705', '#3B82F6']
@@ -65,19 +65,11 @@ function LabelBox({ x, y, lines, font, fill, stroke, strokeWidth, textFill, widt
 }
 
 // 세부 항목: 박스 없이 밑줄만 있는 텍스트(대괄호로 가지와 연결). side: 1=오른쪽, -1=왼쪽.
-function LeafLabel({ textX, centerY, lines, side, color, selected, onClick, title }) {
+function LeafLabel({ textX, centerY, lines, side, color, title }) {
   const anchor = side === 1 ? 'start' : 'end'
   const firstBaseline = centerY - ((lines.length - 1) * LEAF_FONT.lineH) / 2 + LEAF_FONT.size / 2.6
   return (
-    <g className="mt-node mt-leaf" onClick={onClick}>
-      {selected && (
-        <rect
-          x={side === 1 ? textX - 4 : textX - textWidth(lines, LEAF_FONT.charPx) - 4}
-          y={centerY - (lines.length * LEAF_FONT.lineH) / 2 - 2}
-          width={textWidth(lines, LEAF_FONT.charPx) + 8}
-          height={lines.length * LEAF_FONT.lineH + 4}
-          rx={5} fill={`${color}33`} />
-      )}
+    <g className="mt-node mt-leaf">
       <text x={textX} y={firstBaseline} textAnchor={anchor} fontSize={LEAF_FONT.size} fill="#f2f2f2">
         {lines.map((l, i) => (
           <tspan key={i} x={textX} dy={i === 0 ? 0 : LEAF_FONT.lineH}>{l}</tspan>
@@ -94,7 +86,7 @@ function LeafLabel({ textX, centerY, lines, side, color, selected, onClick, titl
   )
 }
 
-export default function MindMap({ mindmap, selected, onSelect }) {
+export default function MindMap({ mindmap }) {
   if (!mindmap) return null
 
   const centerLines = wrapLabel(mindmap.label, CENTER_FONT.maxChars, CENTER_FONT.maxLines)
@@ -150,9 +142,6 @@ export default function MindMap({ mindmap, selected, onSelect }) {
   }
   const positioned = [...layoutSide(right, 1), ...layoutSide(left, -1)]
 
-  const isSel = (kind, label, parent) =>
-    selected && selected.kind === kind && selected.label === label && (kind !== 'leaf' || selected.parent === parent)
-
   return (
     <svg className="mt-map" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="회의 마인드맵">
       {/* 중심 ↔ 가지 연결선 */}
@@ -180,9 +169,7 @@ export default function MindMap({ mindmap, selected, onSelect }) {
             {b.leaves.map((l, j) => (
               <g key={j}>
                 <line x1={spineX} y1={leafCenters[j]} x2={textX} y2={leafCenters[j]} stroke="#3a3a3a" strokeWidth="1.5" />
-                <LeafLabel textX={textX} centerY={leafCenters[j]} lines={l.lines} side={b.side} color={b.color}
-                  selected={isSel('leaf', l.label, b.i)} title={l.label}
-                  onClick={() => onSelect({ kind: 'leaf', label: l.label, parent: b.i })} />
+                <LeafLabel textX={textX} centerY={leafCenters[j]} lines={l.lines} side={b.side} color={b.color} title={l.label} />
               </g>
             ))}
           </g>
@@ -191,19 +178,18 @@ export default function MindMap({ mindmap, selected, onSelect }) {
 
       {/* 가지 박스 */}
       {positioned.map((b) => (
-        <g key={`branch-${b.i}`} className="mt-node mt-branch"
-          onClick={() => onSelect({ kind: 'branch', label: b.label, children: b.leaves.map((l) => l.label) })}>
+        <g key={`branch-${b.i}`} className="mt-node mt-branch">
           <LabelBox x={b.x} y={b.y} lines={b.lines} font={BRANCH_FONT}
-            fill={b.color} stroke="#0d0d0d" strokeWidth={isSel('branch', b.label) ? 4 : 2}
+            fill={b.color} stroke="#0d0d0d" strokeWidth={2}
             textFill="#ffffff" width={b.width} height={b.height} />
           <title>{b.label}</title>
         </g>
       ))}
 
       {/* 중심 박스 */}
-      <g className="mt-node mt-center" onClick={() => onSelect({ kind: 'center', label: mindmap.label })}>
+      <g className="mt-node mt-center">
         <LabelBox x={CX} y={CY} lines={centerLines} font={CENTER_FONT}
-          fill={CENTER_COLOR} stroke="#ffffff" strokeWidth={isSel('center', mindmap.label) ? 4 : 2.5}
+          fill={CENTER_COLOR} stroke="#ffffff" strokeWidth={2.5}
           textFill="#ffffff" width={centerW} height={centerH} />
         <title>{mindmap.label}</title>
       </g>
