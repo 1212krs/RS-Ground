@@ -25,13 +25,14 @@ from __future__ import annotations
 import json
 import sqlite3
 from datetime import datetime, timezone
-from pathlib import Path
 
 from fastapi import APIRouter, Body, HTTPException
 from security import require_json_size, require_max_len
+from rag import config  # DATA_DIR: 배포 시 영구 디스크(/var/data)를 가리킴
 
-BACKEND_DIR = Path(__file__).resolve().parent.parent
-DB_PATH = BACKEND_DIR.parent / "data" / "app.db"
+# 로그인 계정(auth)과 같은 app.db를 쓴다(다른 표). config.DATA_DIR 기준이라
+# 배포 시 영구 디스크에 저장되어 재배포해도 일정·할 일·메모가 유지된다.
+DB_PATH = config.DATA_DIR / "app.db"
 
 # 임의 키로 아무 데이터나 쌓이지 않도록 허용 키를 고정한다.
 LIST_KEYS = {"events", "todos", "memos"}   # 배열로 저장
