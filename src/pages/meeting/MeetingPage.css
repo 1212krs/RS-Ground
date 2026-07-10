@@ -47,23 +47,31 @@
 .mt-summary { margin: 0 0 16px; color: #c4c4c4; font-size: 13px; line-height: 1.7; white-space: pre-wrap; }
 
 .mt-mapwrap { display: flex; gap: 14px; margin-bottom: 18px; flex-wrap: wrap; }
-.mt-mapcanvas { flex: 1; min-width: 280px; background: #fafafa; border: 1px solid #e3e3e3; border-radius: 14px; overflow: hidden; }
+.mt-mapcanvas { flex: 1; min-width: 280px; background: #050505; border: 1px solid #242424; border-radius: 14px; overflow: hidden; }
 .mt-map { width: 100%; height: auto; display: block; }
 .mt-node { cursor: pointer; }
 .mt-node text { pointer-events: none; user-select: none; }
-.mt-node circle { transition: stroke-width .1s, filter .1s; }
-.mt-node:hover circle { filter: brightness(1.05); }
-.mt-term circle { stroke-dasharray: none; }
+.mt-node rect, .mt-node circle { transition: stroke-width .1s, filter .1s; }
+.mt-node:hover rect, .mt-node:hover circle { filter: brightness(1.15); }
 
 .mt-panel { flex: 0 0 300px; max-width: 100%; background: #161616; border: 1px solid #242424; border-radius: 14px; padding: 16px 18px; align-self: flex-start; }
-.mt-panel.is-term { border-color: #6C5CE7; }
 .mt-panel strong { display: block; font-size: 14px; margin-bottom: 8px; }
-.mt-panel p { margin: 0; color: #c4c4c4; font-size: 12.5px; line-height: 1.7; }
+.mt-panel p { margin: 0; color: #c4c4c4; font-size: 12.5px; line-height: 1.7; white-space: pre-wrap; }
 .mt-panel-hint { color: #7a7a7a; }
 
-/* 액션/일정 블록 */
+/* 액션/일정/용어 블록 */
 .mt-block { background: #161616; border: 1px solid #242424; border-radius: 14px; padding: 18px 20px; margin-bottom: 14px; }
 .mt-block h3 { display: flex; align-items: center; gap: 7px; margin: 0 0 12px; font-size: 14px; font-weight: 600; }
+
+/* 용어 설명(부가 정보 — 접어두는 상세 섹션) */
+.mt-glossary summary { display: flex; align-items: center; gap: 7px; font-size: 14px; font-weight: 600; cursor: pointer; color: #ededed; list-style: none; }
+.mt-glossary summary::-webkit-details-marker { display: none; }
+.mt-glossary[open] summary { margin-bottom: 12px; }
+.mt-glossary-list { margin: 0; display: grid; gap: 10px; }
+.mt-glossary-item { border-top: 1px solid #202020; padding-top: 10px; }
+.mt-glossary-item:first-child { border-top: 0; padding-top: 0; }
+.mt-glossary-item dt { font-size: 13px; font-weight: 700; color: #ededed; margin: 0 0 4px; }
+.mt-glossary-item dd { margin: 0; font-size: 12.5px; color: #b8b8b8; line-height: 1.6; }
 .mt-checklist { list-style: none; margin: 0 0 14px; padding: 0; display: grid; gap: 8px; }
 .mt-checklist label { display: flex; align-items: flex-start; gap: 9px; font-size: 13px; line-height: 1.5; cursor: pointer; }
 .mt-checklist input { margin-top: 3px; accent-color: #6C5CE7; flex: 0 0 auto; }

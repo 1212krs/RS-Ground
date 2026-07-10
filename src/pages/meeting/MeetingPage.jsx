@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
-import { Menu, Sparkles, FileText, Trash2, ChevronLeft, CheckCircle2, CalendarPlus } from 'lucide-react'
+import { Menu, Sparkles, FileText, Trash2, ChevronLeft, CheckCircle2, CalendarPlus, BookOpen } from 'lucide-react'
 import { analyzeMeeting, listMeetings, getMeeting, removeMeeting, appendToStore } from '../../meetingApi.js'
 import MindMap from './MindMap.jsx'
 import './MeetingPage.css'
@@ -139,18 +139,18 @@ export default function MeetingPage() {
     }
   }
 
-  // 선택한 노드에 대해 보여줄 설명(용어면 미리 만든 설명, 아니면 라벨/안내)
+  // 선택한 노드에 대해 보여줄 설명. 용어 설명은 별도 섹션에 있으므로 여기서는 회의 내용만 다룬다.
   const selectedInfo = () => {
     if (!selected) return null
     const a = result?.analysis
     if (selected.kind === 'center') return { head: selected.label, body: a?.summary || '회의의 중심 주제입니다.' }
-    if (selected.kind === 'branch') return { head: selected.label, body: '이 안건의 세부 항목을 원 밖에서 확인하세요. 용어(진한 테두리)를 누르면 쉬운 설명이 나옵니다.' }
-    // leaf
-    if (selected.term) {
-      const t = (a?.terms || []).find((x) => x.term === selected.label)
-      return { head: selected.label, body: t ? t.explanation : '이 용어에 대한 설명이 준비되지 않았습니다.', isTerm: true }
+    if (selected.kind === 'branch') {
+      const body = selected.children?.length
+        ? selected.children.map((c) => `• ${c}`).join('\n')
+        : '이 안건에는 세부 항목이 없습니다.'
+      return { head: selected.label, body }
     }
-    return { head: selected.label, body: '회의에서 논의된 항목입니다.' }
+    return { head: selected.label, body: '이 안건에서 논의된 세부 내용입니다.' }
   }
   const info = selectedInfo()
 
@@ -229,17 +229,32 @@ export default function MeetingPage() {
             <div className="mt-mapcanvas">
               <MindMap mindmap={result.analysis.mindmap} selected={selected} onSelect={setSelected} />
             </div>
-            <aside className={`mt-panel${info?.isTerm ? ' is-term' : ''}`}>
+            <aside className="mt-panel">
               {info ? (
                 <>
                   <strong>{info.head}</strong>
                   <p>{info.body}</p>
                 </>
               ) : (
-                <p className="mt-panel-hint">노드를 클릭하면 설명이 여기 나와요. 진한 테두리 = 용어(클릭 시 쉬운 설명).</p>
+                <p className="mt-panel-hint">노드를 클릭하면 설명이 여기 나와요. 전문 용어는 아래 '용어 설명'에서 따로 확인하세요.</p>
               )}
             </aside>
           </div>
+
+          {/* 용어 설명 (마인드맵과 분리된 부가 정보) */}
+          {result.analysis.terms?.length > 0 && (
+            <details className="mt-block mt-glossary">
+              <summary><BookOpen size={16} /> 용어 설명 ({result.analysis.terms.length})</summary>
+              <dl className="mt-glossary-list">
+                {result.analysis.terms.map((t, i) => (
+                  <div key={i} className="mt-glossary-item">
+                    <dt>{t.term}</dt>
+                    <dd>{t.explanation}</dd>
+                  </div>
+                ))}
+              </dl>
+            </details>
+          )}
 
           {/* 액션 아이템 */}
           {result.analysis.action_items?.length > 0 && (
