@@ -16,6 +16,9 @@
 .rte-hl-icon { color: #8a8a8a; margin-right: 2px; }
 .rte-swatch { width: 16px; height: 16px; border: 1px solid rgba(255,255,255,.2); border-radius: 4px; cursor: pointer; padding: 0; }
 .rte-swatch:hover { transform: scale(1.12); }
+/* 프리셋 외 자유 색상을 고르는 컬러 피커 스와치 (글자색/형광펜 공용) */
+.rte-swatch-custom { position: relative; display: inline-grid; place-items: center; overflow: hidden; background: conic-gradient(red, yellow, lime, cyan, blue, magenta, red); }
+.rte-swatch-custom input[type="color"] { position: absolute; inset: -4px; width: calc(100% + 8px); height: calc(100% + 8px); border: 0; padding: 0; opacity: 0; cursor: pointer; }
 
 /* 콘텐츠(ProseMirror) */
 .rte-content { max-height: 60vh; overflow-y: auto; }

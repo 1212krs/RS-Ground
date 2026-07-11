@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { ArrowLeft, ArrowRight, Plus, Trash2, X } from 'lucide-react'
 import { uid } from '../../utils.js'
 import {
-  WEEKDAYS, TONES, buildMonthGrid, shiftMonth, monthLabel, todayStr, groupEventsByDate,
+  WEEKDAYS, TONES, buildMonthGrid, shiftMonth, monthLabel, todayStr, groupEventsByDate, isCustomTone,
 } from './calendarUtils.js'
 
 const MAX_VISIBLE = 3 // 셀 안에 최대 몇 개까지 일정을 보여줄지
@@ -111,7 +111,11 @@ export default function CalendarPanel({ events, setEvents, notify }) {
                 <span className="cal-cell-day">{cell.day}</span>
                 <span className="cal-cell-events">
                   {dayEvents.slice(0, MAX_VISIBLE).map((event) => (
-                    <span key={event.id} className={`cal-chip ${event.tone}`}>
+                    <span
+                      key={event.id}
+                      className={`cal-chip ${isCustomTone(event.tone) ? '' : event.tone}`}
+                      style={isCustomTone(event.tone) ? { color: event.tone } : undefined}
+                    >
                       {event.startTime && <em>{event.startTime}</em>}{event.title}
                     </span>
                   ))}
@@ -138,7 +142,10 @@ export default function CalendarPanel({ events, setEvents, notify }) {
               <div className="cal-daylist">
                 {selectedEvents.map((event) => (
                   <button key={event.id} className="cal-dayitem" onClick={() => startEdit(event)}>
-                    <span className={`cal-dot ${event.tone}`} />
+                    <span
+                      className={`cal-dot ${isCustomTone(event.tone) ? '' : event.tone}`}
+                      style={isCustomTone(event.tone) ? { background: event.tone } : undefined}
+                    />
                     <span className="cal-dayitem-body">
                       <strong>{event.title}</strong>
                       {event.startTime && <small>{event.startTime}{event.endTime ? `–${event.endTime}` : ''}</small>}
@@ -187,6 +194,18 @@ export default function CalendarPanel({ events, setEvents, notify }) {
                       aria-pressed={draft.tone === tone.id}
                     />
                   ))}
+                  <label
+                    className={`cal-tone cal-tone-custom ${isCustomTone(draft.tone) ? 'on' : ''}`}
+                    style={isCustomTone(draft.tone) ? { background: draft.tone } : undefined}
+                    title="다른 색상 선택"
+                  >
+                    <input
+                      type="color"
+                      value={isCustomTone(draft.tone) ? draft.tone : '#888888'}
+                      onChange={(e) => setDraft((d) => ({ ...d, tone: e.target.value }))}
+                      aria-label="다른 색상 선택"
+                    />
+                  </label>
                 </div>
               </div>
               <label className="cal-field">

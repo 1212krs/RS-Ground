@@ -57,6 +57,9 @@ function Toolbar({ editor }) {
             title={`글자색 ${c}`} onMouseDown={(e) => e.preventDefault()}
             onClick={() => chain().setColor(c).run()} />
         ))}
+        <label className="rte-swatch rte-swatch-custom" title="다른 색상 선택" onMouseDown={(e) => e.preventDefault()}>
+          <input type="color" aria-label="글자색 직접 선택" onChange={(e) => chain().setColor(e.target.value).run()} />
+        </label>
         <Btn title="글자색 지우기" on={() => chain().unsetColor().run()}><RemoveFormatting size={14} /></Btn>
       </div>
       <span className="rte-sep" />
@@ -69,6 +72,9 @@ function Toolbar({ editor }) {
             title={`형광펜 ${c}`} onMouseDown={(e) => e.preventDefault()}
             onClick={() => chain().toggleHighlight({ color: c }).run()} />
         ))}
+        <label className="rte-swatch rte-swatch-custom" title="다른 색상 선택" onMouseDown={(e) => e.preventDefault()}>
+          <input type="color" aria-label="형광펜 직접 선택" onChange={(e) => chain().toggleHighlight({ color: e.target.value }).run()} />
+        </label>
         <Btn title="형광펜 지우기" on={() => chain().unsetHighlight().run()}><RemoveFormatting size={14} /></Btn>
       </div>
       <span className="rte-sep" />

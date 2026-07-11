@@ -12,6 +12,9 @@ export const TONES = [
   { id: 'violet', label: '보라' },
 ]
 
+// 프리셋(TONES) 외에 사용자가 컬러 피커로 직접 고른 색은 '#rrggbb' 문자열로 저장된다.
+export const isCustomTone = (tone) => /^#[0-9a-f]{6}$/i.test(tone || '')
+
 const pad2 = (n) => String(n).padStart(2, '0')
 
 // month는 0-based(0=1월). 'YYYY-MM-DD' 문자열을 만든다.
