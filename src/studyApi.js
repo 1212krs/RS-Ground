@@ -16,6 +16,20 @@ async function req(path, options = {}) {
 export const listStudies = (q = '') =>
   req(`/api/study${q ? `?q=${encodeURIComponent(q)}` : ''}`)
 
+// 분류(카테고리) 목록: { subjects: [{ id, name, count }] } — 빈 분류도 포함
+export const listSubjects = () => req('/api/study/subjects')
+
+// 분류 생성 → { id, name }
+export const createSubject = (name) =>
+  req('/api/study/subjects', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name }),
+  })
+
+// 분류 삭제(노트가 남아있으면 409 오류)
+export const removeSubject = (id) => req(`/api/study/subjects/${id}`, { method: 'DELETE' })
+
 // 노트 1건 상세(본문 + 첨부 목록)
 export const getStudy = (id) => req(`/api/study/${id}`)
 

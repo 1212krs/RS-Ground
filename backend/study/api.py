@@ -54,6 +54,8 @@ def _note_payload(payload: dict) -> tuple[str, str, list[str], str]:
     content = payload.get("content") or ""
     if not title:
         raise HTTPException(400, "제목을 입력하세요.")
+    if not subject:
+        raise HTTPException(400, "분류를 선택하세요.")
     require_max_len(title, "title", 200)
     require_max_len(subject, "subject", 80)
     require_max_len(content, "content", CONTENT_LIMIT)
@@ -68,6 +70,31 @@ def list_or_search(q: str = ""):
         require_max_len(q, "q", 200)
         return {"notes": store.search_notes(q), "query": q}
     return {"notes": store.list_notes()}
+
+
+# --- 분류(카테고리) --- (라우트 순서 주의: /{note_id} 보다 먼저 선언해야 'subjects'가 정수로 파싱되지 않는다)
+@router.get("/subjects")
+def list_subjects():
+    return {"subjects": store.list_subjects()}
+
+
+@router.post("/subjects")
+def create_subject(payload: dict = Body(...)):
+    name = (payload.get("name") or "").strip()
+    if not name:
+        raise HTTPException(400, "분류 이름을 입력하세요.")
+    require_max_len(name, "name", 80)
+    return store.create_subject(name)
+
+
+@router.delete("/subjects/{subject_id}")
+def delete_subject(subject_id: int):
+    result = store.delete_subject(subject_id)
+    if result == "not_found":
+        raise HTTPException(404, "분류를 찾을 수 없습니다.")
+    if result == "non_empty":
+        raise HTTPException(409, "노트가 남아 있어 분류를 삭제할 수 없습니다. 먼저 노트를 비워 주세요.")
+    return {"ok": True}
 
 
 @router.get("/{note_id}")

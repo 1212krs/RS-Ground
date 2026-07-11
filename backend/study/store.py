@@ -52,7 +52,74 @@ def _connect() -> sqlite3.Connection:
         "  created_at TEXT NOT NULL"
         ")"
     )
+    # 분류(카테고리)를 노트와 별개로 보관 → 노트가 없는 빈 분류도 유지된다.
+    # 노트는 subject(이름 문자열)로 분류를 참조한다.
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS study_subjects ("
+        "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        "  name TEXT NOT NULL UNIQUE,"
+        "  created_at TEXT NOT NULL"
+        ")"
+    )
     return conn
+
+
+def _ensure_subject(conn: sqlite3.Connection, name: str) -> None:
+    """노트 저장 시 분류가 study_subjects에 반드시 존재하도록 등록(중복 무시)."""
+    if name:
+        conn.execute(
+            "INSERT OR IGNORE INTO study_subjects (name, created_at) VALUES (?, ?)",
+            (name, _now()),
+        )
+
+
+# --- 분류(카테고리) --------------------------------------------------------
+
+def list_subjects() -> list[dict]:
+    """분류 목록 + 각 분류의 노트 수. 빈 분류도 포함. 이름순."""
+    conn = _connect()
+    try:
+        rows = conn.execute(
+            "SELECT s.id, s.name, COUNT(n.id) "
+            "FROM study_subjects s LEFT JOIN study_notes n ON n.subject = s.name "
+            "GROUP BY s.id, s.name ORDER BY s.name COLLATE NOCASE"
+        ).fetchall()
+    finally:
+        conn.close()
+    return [{"id": r[0], "name": r[1], "count": r[2]} for r in rows]
+
+
+def create_subject(name: str) -> dict:
+    """분류 생성. 이미 있으면 기존 것을 반환."""
+    now = _now()
+    conn = _connect()
+    try:
+        conn.execute("INSERT OR IGNORE INTO study_subjects (name, created_at) VALUES (?, ?)", (name, now))
+        conn.commit()
+        row = conn.execute("SELECT id, name FROM study_subjects WHERE name = ?", (name,)).fetchone()
+    finally:
+        conn.close()
+    return {"id": row[0], "name": row[1]}
+
+
+def delete_subject(subject_id: int) -> str:
+    """분류 삭제. 노트가 남아있으면 삭제하지 않는다.
+
+    반환: 'ok'(삭제됨) | 'not_found' | 'non_empty'(노트가 있어 못 지움).
+    """
+    conn = _connect()
+    try:
+        row = conn.execute("SELECT name FROM study_subjects WHERE id = ?", (subject_id,)).fetchone()
+        if row is None:
+            return "not_found"
+        count = conn.execute("SELECT COUNT(*) FROM study_notes WHERE subject = ?", (row[0],)).fetchone()[0]
+        if count > 0:
+            return "non_empty"
+        conn.execute("DELETE FROM study_subjects WHERE id = ?", (subject_id,))
+        conn.commit()
+        return "ok"
+    finally:
+        conn.close()
 
 
 def _load_tags(raw: str) -> list[str]:
@@ -74,6 +141,7 @@ def create_note(title: str, subject: str, tags: list[str], content: str) -> dict
             "VALUES (?, ?, ?, ?, ?, ?)",
             (title, subject, json.dumps(tags, ensure_ascii=False), content, now, now),
         )
+        _ensure_subject(conn, subject)
         conn.commit()
         return {"id": cur.lastrowid, "created_at": now, "updated_at": now}
     finally:
@@ -88,6 +156,7 @@ def update_note(note_id: int, title: str, subject: str, tags: list[str], content
             "UPDATE study_notes SET title=?, subject=?, tags=?, content=?, updated_at=? WHERE id=?",
             (title, subject, json.dumps(tags, ensure_ascii=False), content, now, note_id),
         )
+        _ensure_subject(conn, subject)
         conn.commit()
         return cur.rowcount > 0
     finally:
