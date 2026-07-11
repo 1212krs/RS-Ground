@@ -1,0 +1,52 @@
+/* 리치 에디터(TipTap) — 다크 테마 */
+.rte { border: 1px solid #2a2a2a; border-radius: 12px; background: #121212; overflow: hidden; }
+.rte-readonly { border-color: #242424; background: #131313; }
+
+/* 툴바 */
+.rte-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 3px; padding: 8px 10px;
+  border-bottom: 1px solid #242424; background: #171717; position: sticky; top: 0; z-index: 2; }
+.rte-btn { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px;
+  border: 0; border-radius: 7px; background: transparent; color: #b8b8b8; cursor: pointer; }
+.rte-btn:hover:not(:disabled) { background: #262626; color: #ededed; }
+.rte-btn.on { background: #2f2a4d; color: #b3a7f5; }
+.rte-btn:disabled { opacity: .4; cursor: default; }
+.rte-btn .rte-del { opacity: .55; }
+.rte-sep { width: 1px; height: 20px; background: #2c2c2c; margin: 0 4px; }
+.rte-colors { display: inline-flex; align-items: center; gap: 3px; }
+.rte-hl-icon { color: #8a8a8a; margin-right: 2px; }
+.rte-swatch { width: 16px; height: 16px; border: 1px solid rgba(255,255,255,.2); border-radius: 4px; cursor: pointer; padding: 0; }
+.rte-swatch:hover { transform: scale(1.12); }
+
+/* 콘텐츠(ProseMirror) */
+.rte-content { max-height: 60vh; overflow-y: auto; }
+.rte-readonly .rte-content { max-height: none; }
+.ProseMirror { padding: 16px 18px; min-height: 220px; outline: none; font-size: 13.5px; line-height: 1.75; color: #dcdcdc; }
+.rte-readonly .ProseMirror { min-height: 0; }
+.ProseMirror:focus { outline: none; }
+.ProseMirror > *:first-child { margin-top: 0; }
+.ProseMirror p { margin: 8px 0; }
+.ProseMirror h1 { font-size: 20px; font-weight: 700; margin: 18px 0 10px; color: #fff; }
+.ProseMirror h2 { font-size: 16.5px; font-weight: 700; margin: 16px 0 8px; color: #fff; }
+.ProseMirror h3 { font-size: 14.5px; font-weight: 700; margin: 14px 0 6px; color: #f0f0f0; }
+.ProseMirror ul, .ProseMirror ol { margin: 8px 0; padding-left: 22px; }
+.ProseMirror li { margin: 3px 0; }
+.ProseMirror li p { margin: 0; }
+.ProseMirror blockquote { margin: 10px 0; padding: 4px 14px; border-left: 3px solid #3a3a3a; color: #a8a8a8; }
+.ProseMirror code { background: #1c1c1c; border: 1px solid #2a2a2a; border-radius: 5px; padding: 1px 5px; font-size: 12px; font-family: ui-monospace, Menlo, monospace; }
+.ProseMirror pre { background: #0f0f0f; border: 1px solid #242424; border-radius: 10px; padding: 13px 15px; overflow-x: auto; margin: 10px 0; }
+.ProseMirror pre code { background: transparent; border: 0; padding: 0; color: #c4c4c4; }
+.ProseMirror a { color: #4a9eff; text-decoration: underline; }
+.ProseMirror mark { border-radius: 3px; padding: 0 2px; color: #111; }
+.ProseMirror hr { border: 0; border-top: 1px solid #2c2c2c; margin: 16px 0; }
+
+/* 표 */
+.ProseMirror table { border-collapse: collapse; margin: 12px 0; width: auto; overflow: hidden; }
+.ProseMirror th, .ProseMirror td { border: 1px solid #333; padding: 7px 10px; min-width: 60px; vertical-align: top; text-align: left; }
+.ProseMirror th { background: #1e1e1e; font-weight: 700; color: #ededed; }
+.ProseMirror td { background: #151515; }
+.ProseMirror .selectedCell:after { content: ''; position: absolute; inset: 0; background: rgba(108,92,231,.18); pointer-events: none; }
+.ProseMirror .column-resize-handle { position: absolute; right: -2px; top: 0; bottom: 0; width: 4px; background: #6C5CE7; pointer-events: none; }
+.ProseMirror table .selectedCell { position: relative; }
+
+/* placeholder(빈 편집기) */
+.ProseMirror p.is-editor-empty:first-child::before { content: attr(data-placeholder); color: #4a4a4a; float: left; height: 0; pointer-events: none; }

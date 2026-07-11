@@ -11,8 +11,10 @@ config.DATA_DIR 기준이라 재배포에도 유지된다.
 
 from __future__ import annotations
 
+import html as _htmllib
 import json
 import os
+import re
 import sqlite3
 import uuid
 from datetime import datetime, timezone
@@ -61,7 +63,25 @@ def _connect() -> sqlite3.Connection:
         "  created_at TEXT NOT NULL"
         ")"
     )
+    # 마이그레이션: content가 HTML(리치 에디터)로 바뀌면서 검색·미리보기용 순수 텍스트 컬럼 추가.
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(study_notes)").fetchall()}
+    if "plain" not in cols:
+        conn.execute("ALTER TABLE study_notes ADD COLUMN plain TEXT NOT NULL DEFAULT ''")
     return conn
+
+
+_TAG_RE = re.compile(r"<[^>]+>")
+_WS_RE = re.compile(r"\s+")
+
+
+def _strip_html(content: str) -> str:
+    """HTML 본문 → 순수 텍스트(검색·미리보기용). 블록 태그는 공백으로 끊는다."""
+    if not content:
+        return ""
+    text = re.sub(r"<(br|/p|/div|/li|/h[1-6]|/tr|tr)[^>]*>", " ", content, flags=re.I)
+    text = _TAG_RE.sub("", text)
+    text = _htmllib.unescape(text)
+    return _WS_RE.sub(" ", text).strip()
 
 
 def _ensure_subject(conn: sqlite3.Connection, name: str) -> None:
@@ -137,9 +157,9 @@ def create_note(title: str, subject: str, tags: list[str], content: str) -> dict
     conn = _connect()
     try:
         cur = conn.execute(
-            "INSERT INTO study_notes (title, subject, tags, content, created_at, updated_at) "
-            "VALUES (?, ?, ?, ?, ?, ?)",
-            (title, subject, json.dumps(tags, ensure_ascii=False), content, now, now),
+            "INSERT INTO study_notes (title, subject, tags, content, plain, created_at, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (title, subject, json.dumps(tags, ensure_ascii=False), content, _strip_html(content), now, now),
         )
         _ensure_subject(conn, subject)
         conn.commit()
@@ -153,8 +173,8 @@ def update_note(note_id: int, title: str, subject: str, tags: list[str], content
     conn = _connect()
     try:
         cur = conn.execute(
-            "UPDATE study_notes SET title=?, subject=?, tags=?, content=?, updated_at=? WHERE id=?",
-            (title, subject, json.dumps(tags, ensure_ascii=False), content, now, note_id),
+            "UPDATE study_notes SET title=?, subject=?, tags=?, content=?, plain=?, updated_at=? WHERE id=?",
+            (title, subject, json.dumps(tags, ensure_ascii=False), content, _strip_html(content), now, note_id),
         )
         _ensure_subject(conn, subject)
         conn.commit()
@@ -163,14 +183,9 @@ def update_note(note_id: int, title: str, subject: str, tags: list[str], content
         conn.close()
 
 
-def _preview(content: str) -> str:
-    line = ""
-    for raw in content.splitlines():
-        stripped = raw.strip().lstrip("#>-*・ ").strip()
-        if stripped:
-            line = stripped
-            break
-    return line[:100]
+def _preview(plain: str) -> str:
+    """순수 텍스트 앞부분을 미리보기로."""
+    return (plain or "").strip()[:100]
 
 
 def list_notes() -> list[dict]:
@@ -178,7 +193,7 @@ def list_notes() -> list[dict]:
     conn = _connect()
     try:
         rows = conn.execute(
-            "SELECT id, title, subject, tags, content, updated_at FROM study_notes "
+            "SELECT id, title, subject, tags, plain, updated_at FROM study_notes "
             "ORDER BY updated_at DESC, id DESC"
         ).fetchall()
     finally:
@@ -208,9 +223,9 @@ def search_notes(q: str) -> list[dict]:
     conn = _connect()
     try:
         rows = conn.execute(
-            "SELECT DISTINCT n.id, n.title, n.subject, n.tags, n.content, n.updated_at "
+            "SELECT DISTINCT n.id, n.title, n.subject, n.tags, n.plain, n.updated_at "
             "FROM study_notes n LEFT JOIN study_files f ON f.note_id = n.id "
-            "WHERE n.title LIKE ? OR n.content LIKE ? OR n.tags LIKE ? OR f.extracted_text LIKE ? "
+            "WHERE n.title LIKE ? OR n.plain LIKE ? OR n.tags LIKE ? OR f.extracted_text LIKE ? "
             "ORDER BY n.updated_at DESC, n.id DESC",
             (like, like, like, like),
         ).fetchall()
@@ -219,8 +234,8 @@ def search_notes(q: str) -> list[dict]:
     out = []
     for r in rows:
         # 본문에 매치가 있으면 본문 스니펫, 아니면 제목/태그 매치이므로 preview.
-        content = r[4]
-        snippet = _snippet(content, q) if q.lower() in content.lower() else _preview(content)
+        plain = r[4]
+        snippet = _snippet(plain, q) if q.lower() in plain.lower() else _preview(plain)
         out.append({"id": r[0], "title": r[1], "subject": r[2], "tags": _load_tags(r[3]),
                     "preview": snippet, "updated_at": r[5]})
     return out

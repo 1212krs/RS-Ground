@@ -28,7 +28,7 @@ from .extractors import SUPPORTED_SUFFIXES, extract_upload_text
 
 router = APIRouter(prefix="/api/study")
 
-CONTENT_LIMIT = 100_000
+CONTENT_LIMIT = 500_000   # HTML(리치 에디터)은 태그로 부피가 커져 여유 있게
 
 
 def _parse_tags(raw) -> list[str]:

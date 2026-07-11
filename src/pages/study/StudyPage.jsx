@@ -6,7 +6,7 @@ import {
   listSubjects, createSubject, removeSubject,
   uploadStudyFile, removeStudyFile, downloadStudyFile,
 } from '../../studyApi.js'
-import { renderMarkdown } from '../../markdown.js'
+import RichEditor from './RichEditor.jsx'
 import './StudyPage.css'
 
 const ACCEPT = '.txt,.md,.csv,.pdf,.docx,.hwpx,.hwp'
@@ -309,11 +309,7 @@ export default function StudyPage() {
             <datalist id="st-tags">{knownTags.map((t) => <option key={t} value={t} />)}</datalist>
           </div>
 
-          <div className="st-split">
-            <textarea className="st-md-input" placeholder="# 제목&#10;- 목록&#10;**굵게** *기울임* `코드`&#10;&gt; 인용"
-              value={content} onChange={(e) => setContent(e.target.value)} />
-            <div className="st-md-preview st-markdown" dangerouslySetInnerHTML={{ __html: renderMarkdown(content) }} />
-          </div>
+          <RichEditor key={editId ?? 'new'} editable value={content} onChange={setContent} />
 
           <div className="st-attach">
             <button className="st-attach-btn" onClick={() => fileInputRef.current?.click()} disabled={uploading}>
@@ -360,7 +356,9 @@ export default function StudyPage() {
             {(current.tags || []).map((t) => <span key={t} className="st-tag-chip">#{t}</span>)}
           </div>
 
-          <div className="st-markdown st-view-body" dangerouslySetInnerHTML={{ __html: renderMarkdown(current.content) }} />
+          <div className="st-view-body">
+            <RichEditor key={current.id} editable={false} value={current.content} />
+          </div>
 
           {current.files?.length > 0 && (
             <section className="st-files">
