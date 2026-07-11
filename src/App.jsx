@@ -13,6 +13,7 @@ const ReportsPage = lazy(() => import('./pages/reports/ReportsPage.jsx'))
 const ChatPage = lazy(() => import('./pages/chat/ChatPage.jsx'))
 const AgentsPage = lazy(() => import('./pages/agents/AgentsPage.jsx'))
 const MeetingPage = lazy(() => import('./pages/meeting/MeetingPage.jsx'))
+const StudyPage = lazy(() => import('./pages/study/StudyPage.jsx'))
 const ComingSoonPage = lazy(() => import('./pages/coming-soon/ComingSoonPage.jsx'))
 const NotFoundPage = lazy(() => import('./pages/not-found/NotFoundPage.jsx'))
 
@@ -40,6 +41,7 @@ function App() {
           <Route path="chat" element={<ChatPage />} />
           <Route path="agents" element={<AgentsPage />} />
           <Route path="meeting" element={<MeetingPage />} />
+          <Route path="study" element={<StudyPage />} />
           {PENDING_NAV.map(({ id, path, label }) => (
             <Route key={id} path={path.slice(1)} element={<ComingSoonPage label={label} />} />
           ))}

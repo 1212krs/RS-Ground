@@ -42,6 +42,7 @@ except ImportError as ex:  # chromadb 등 미설치 환경 — 보고서 API만�
 from report.api import router as report_router
 from store.api import router as store_router
 from meeting.api import router as meeting_router
+from study.api import router as study_router
 from auth.api import AuthMiddleware, router as auth_router
 
 # 로그인 창구(/api/auth/*)를 연다.
@@ -49,6 +50,7 @@ app.include_router(auth_router)
 app.include_router(report_router)
 app.include_router(store_router)
 app.include_router(meeting_router)
+app.include_router(study_router)
 
 # 문지기: /api/rag·/api/report·/api/store 요청에 유효한 출입증(토큰)이 있는지 검사한다.
 # (라우터 등록 뒤에 추가해도 요청 처리 시점에 적용된다. /api/auth·OPTIONS는 통과.)

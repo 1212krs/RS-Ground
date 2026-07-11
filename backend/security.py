@@ -14,6 +14,7 @@ from starlette.responses import Response
 MAX_REQUEST_BYTES = int(os.environ.get("RSG_MAX_REQUEST_BYTES", 12 * 1024 * 1024))
 MAX_RAG_UPLOAD_BYTES = int(os.environ.get("RSG_MAX_RAG_UPLOAD_BYTES", 10 * 1024 * 1024))
 MAX_REPORT_UPLOAD_BYTES = int(os.environ.get("RSG_MAX_REPORT_UPLOAD_BYTES", 5 * 1024 * 1024))
+MAX_STUDY_UPLOAD_BYTES = int(os.environ.get("RSG_MAX_STUDY_UPLOAD_BYTES", 10 * 1024 * 1024))
 MAX_STORE_BYTES = int(os.environ.get("RSG_MAX_STORE_BYTES", 200 * 1024))
 
 
