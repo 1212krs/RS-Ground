@@ -41,6 +41,11 @@ export default function StudyPage() {
   // 상세 보기
   const [current, setCurrent] = useState(null)
 
+  // 분류 추가 모달
+  const [subjectModal, setSubjectModal] = useState(false)
+  const [newSubject, setNewSubject] = useState('')
+  const [creatingSubject, setCreatingSubject] = useState(false)
+
   const loadNotes = async (q = '') => {
     setLoading(true)
     try {
@@ -84,15 +89,20 @@ export default function StudyPage() {
   }, [notes])
 
   // --- 분류 ---
-  const addSubject = async () => {
-    const name = window.prompt('새 분류 이름 (예: 행정법)')
-    if (!name || !name.trim()) return
+  const openSubjectModal = () => { setNewSubject(''); setSubjectModal(true) }
+  const submitSubject = async () => {
+    const name = newSubject.trim()
+    if (!name || creatingSubject) return
+    setCreatingSubject(true)
     try {
-      await createSubject(name.trim())
+      await createSubject(name)
       await loadSubjects()
+      setSubjectModal(false)
       notify('분류를 만들었습니다.')
     } catch (err) {
       notify(`분류 생성 실패: ${err.message}`, 'error')
+    } finally {
+      setCreatingSubject(false)
     }
   }
   const deleteSubject = async (sid, name, e) => {
@@ -220,7 +230,7 @@ export default function StudyPage() {
                 value={query} onChange={(e) => setQuery(e.target.value)} />
               {query && <button className="st-search-clear" onClick={() => setQuery('')} aria-label="지우기"><X size={14} /></button>}
             </div>
-            <button className="st-primary" onClick={addSubject}><FolderPlus size={16} /> 분류 추가</button>
+            <button className="st-primary" onClick={openSubjectModal}><FolderPlus size={16} /> 분류 추가</button>
           </div>
 
           {searching ? (
@@ -367,6 +377,28 @@ export default function StudyPage() {
               </ul>
             </section>
           )}
+        </div>
+      )}
+
+      {/* ---------- 분류 추가 모달 ---------- */}
+      {subjectModal && (
+        <div className="st-modal-backdrop" onMouseDown={() => setSubjectModal(false)}>
+          <div className="st-modal" role="dialog" aria-modal="true" aria-label="새 분류" onMouseDown={(e) => e.stopPropagation()}>
+            <h3 className="st-modal-title">새 분류</h3>
+            <input className="st-input st-modal-input" autoFocus placeholder="예: 행정법"
+              value={newSubject}
+              onChange={(e) => setNewSubject(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') submitSubject()
+                else if (e.key === 'Escape') setSubjectModal(false)
+              }} />
+            <div className="st-modal-actions">
+              <button className="st-secondary" onClick={() => setSubjectModal(false)}>취소</button>
+              <button className="st-primary" onClick={submitSubject} disabled={!newSubject.trim() || creatingSubject}>
+                {creatingSubject ? '만드는 중…' : '만들기'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
