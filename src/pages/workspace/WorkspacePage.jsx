@@ -1,7 +1,7 @@
 import { useRef } from 'react'
 import { useNavigate, useOutletContext, useLocation } from 'react-router-dom'
 import { CalendarDays, CheckCircle2, Menu, NotebookPen } from 'lucide-react'
-import { initialTodos, initialMemos, seedEvents } from '../../data.js'
+import { initialMemos, seedEvents } from '../../data.js'
 import { useServerState } from '../../hooks/useServerState.js'
 import CalendarPanel from './CalendarPanel.jsx'
 import TodosPanel from './TodosPanel.jsx'
@@ -32,7 +32,6 @@ export default function WorkspacePage() {
 
   // 서버(SQLite)에 저장. 기존 localStorage 데이터('ground-*')는 최초 1회 서버로 옮긴다.
   const [events, setEvents] = useServerState('events', seedEvents, 'ground-events')
-  const [todos, setTodos] = useServerState('todos', initialTodos, 'ground-todos')
   const [memos, setMemos] = useServerState('memos', initialMemos, 'ground-memos')
 
   const activeIndex = pathToIndex(location.pathname)
@@ -79,7 +78,7 @@ export default function WorkspacePage() {
             <CalendarPanel events={events} setEvents={setEvents} notify={notify} />
           </section>
           <section className="ws-slide" aria-hidden={activeIndex !== 1}>
-            <TodosPanel todos={todos} setTodos={setTodos} notify={notify} />
+            <TodosPanel notify={notify} />
           </section>
           <section className="ws-slide" aria-hidden={activeIndex !== 2}>
             <MemosPanel memos={memos} setMemos={setMemos} notify={notify} />

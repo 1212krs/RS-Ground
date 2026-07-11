@@ -13,14 +13,11 @@ export default defineConfig({
   server: {
     host: '127.0.0.1', port: 5173, strictPort: true,
     proxy: {
-      // 로그인 API (backend/auth/api.py). 로그인/로그아웃/세션확인.
-      '/api/auth': { target: 'http://127.0.0.1:8000', changeOrigin: true },
-      // RAG API (backend/rag/api.py, uvicorn으로 별도 실행 필요). PRD-RAG.md 참고.
-      '/api/rag': { target: 'http://127.0.0.1:8000', changeOrigin: true },
-      // 보고서 API (backend/report/api.py). RAG와 같은 서버(main:app)에서 함께 뜬다.
-      '/api/report': { target: 'http://127.0.0.1:8000', changeOrigin: true },
-      // 워크스페이스 저장 API (backend/store/api.py). 일정·할 일·메모 영속 저장.
-      '/api/store': { target: 'http://127.0.0.1:8000', changeOrigin: true },
+      // 백엔드(auth/rag/report/store/meeting/study/todo 등 모든 /api/* 라우터)를
+      // 8000번 포트로 통째로 전달한다. 기능별로 하나씩 나열하면 새 백엔드 패키지를
+      // 추가할 때마다 이 파일을 잊어버리기 쉬워서(실제로 meeting·study가 누락돼
+      // 있었다), 접두어 하나로 통일했다.
+      '/api': { target: 'http://127.0.0.1:8000', changeOrigin: true },
     },
   },
   preview: { host: '127.0.0.1', port: 5173, strictPort: true },

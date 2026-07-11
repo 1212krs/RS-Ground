@@ -1,10 +1,3 @@
-export const initialTodos = [
-  { id: 1, title: 'AI 업무비서 중간보고 검토', project: 'AI 업무비서', due: '오늘', done: false, priority: 'high' },
-  { id: 2, title: '번역 평가 문장 200개 정리', project: 'AI 다국어 번역', due: '7월 2일', done: false, priority: 'normal' },
-  { id: 3, title: '2분기 예산 집행 증빙 확인', project: 'AI365', due: '7월 4일', done: false, priority: 'normal' },
-  { id: 4, title: '보안 지침 개정본 공유', project: '공통 업무', done: true, due: '완료', priority: 'normal' },
-]
-
 export const initialMemos = [
   { id: 'memo-1', content: 'HWPX 템플릿은 사업계획서와 결과보고서부터 검증하기', date: '오늘 18:24' },
 ]

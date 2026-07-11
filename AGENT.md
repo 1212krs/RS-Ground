@@ -4,7 +4,7 @@
 사실만 기록하며, 아직 구현되지 않은 것은 "미구현/계획"으로 명시합니다.
 
 - **최초 작성**: 2026-07-05
-- **최종 업데이트**: 2026-07-11
+- **최종 업데이트**: 2026-07-11 ('할 일' 탭 — 티켓 기반 칸반 보드)
 - **대상 저장소**: `c:\Users\krs47\Documents\RS-Ground`
 
 > **이 프로젝트가 존재하는 이유**: `RSA Personal Agent`(`c:\Users\krs47\Documents\RSA Personal Agent`, remote `github.com/1212krs/RSA-Ground`)를 전면 재구축하기로 하면서, 실제 작업은 이 폴더(`RS-Ground`)에서 처음부터 새로 시작하기로 함(2026-07-05). `RSA Personal Agent`는 참고용으로 그대로 두고 더 이상 수정하지 않는다.
@@ -64,6 +64,7 @@ src/
   App.jsx                         라우트 정의 (React.lazy + Suspense로 페이지별 지연 로딩)
   api.js / utils.js / data.js     서버 요청 함수 / 공용 유틸(uid) / 데모 데이터(할 일·일정)
   ragApi.js                       RAG API(backend/rag/api.py) 요청 함수 — /api/rag/documents 업로드·목록 조회 + chat()(/api/rag/chat 질의응답)
+  ticketApi.js                    '할 일' 칸반 보드 API(backend/todo/api.py) 요청 함수 — 티켓 CRUD + move(드래그앤드롭) (2026-07-11 추가)
   reportApi.js                    보고서 API(backend/report/api.py) 요청 함수 — 서식 목록/AI 생성/hwpx 다운로드
   context/
     AuthContext.jsx               로그인 상태(user/loading) 전역 관리, 새로고침 시 /api/auth/me로 세션 확인
@@ -98,9 +99,11 @@ backend/
                                   extractors.py(참고파일 텍스트 추출 — txt/md/csv/hwp/hwpx/docx, .hwp OLE 파서 자체 구현),
                                   api.py(APIRouter: GET /api/report/templates·status, POST /api/report/compose·generate),
                                   templates/(서식 hwpx + 지침 md 세트 — "서식이름.hwpx"+"서식이름.md" 쌍, "_공통지침.md"는 전체 공통)
+  todo/                           '할 일' 칸반 보드 패키지 (2026-07-11 추가) — store.py(SQLite tickets 테이블, position 실수 정렬),
+                                  api.py(APIRouter: 티켓 CRUD + PATCH /api/todo/tickets/{id}/move로 상태·순서·시작일/종료일 자동화)
 ```
 
-- **라우트 구성**(`App.jsx`): `/login`(공개) · `/`(보호, `DashboardPage`) · `/knowledge`(보호, `KnowledgePage`) · `/reports`(보호, `ReportsPage`) · `/chat`(보호, `ChatPage`) · `/agents`(보호, `AgentsPage`) · `PENDING_NAV`에 나열된 경로(`/calendar`, `/todos`, `/memos`, `/settings`, 전부 보호)는 `ComingSoonPage`로 연결 · `*`는 `NotFoundPage`.
+- **라우트 구성**(`App.jsx`): `/login`(공개) · `/`·`/calendar`·`/todos`·`/memos`(보호, 모두 같은 `WorkspacePage` — 경로가 활성 탭을 결정) · `/knowledge`(보호, `KnowledgePage`) · `/reports`(보호, `ReportsPage`) · `/chat`(보호, `ChatPage`) · `/agents`(보호, `AgentsPage`) · `/study`(보호, `StudyPage`) · `/meeting`(보호, `MeetingPage`) · `PENDING_NAV`에 남은 경로(`/settings`)는 `ComingSoonPage`로 연결 · `*`는 `NotFoundPage`. (예전엔 `/`만 `DashboardPage`, 나머지는 `ComingSoonPage`였으나 워크스페이스 전환·공부 노트·회의록 추가로 대체됨 — 이 섹션이 한동안 갱신되지 않아 실제 코드와 어긋나 있었음, 2026-07-11 바로잡음.)
 - **다크 배경 페이지**: `AppLayout.jsx`의 `NO_TOPBAR_PATHS`(`/`, `/agents`, `/knowledge`, `/reports`, `/chat`)에 경로를 넣으면 상단바가 사라지고 `.main-area.main-dark`(검정 배경)가 적용된다. 각 페이지는 `.oa`(대시보드)/`.kb`(지식)/`.rp`(보고서)/`.ai`(채팅)/`.ag`(에이전트) 처럼 자기 스코프에 다크 팔레트 CSS 변수를 정의하는 컨벤션(로그인 페이지의 `.nx`와 동일 패턴).
 - **새 화면을 추가하는 규칙**: ① `layouts/navConfig.js`의 해당 항목을 `PENDING_NAV` 대상에서 뺀다 ② `pages/새화면/` 폴더에 실제 컴포넌트+css 작성 ③ `App.jsx`의 `PENDING_NAV.map(...)` 줄 위/아래에 전용 `<Route>`를 추가하고 `lazy(() => import(...))`로 불러온다.
 
@@ -120,13 +123,15 @@ backend/
 - 자동 테스트 3개(vitest): 미로그인 시 `/` 접근 시 로그인 화면 노출, 알 수 없는 주소는 404, Login 버튼 클릭 시 폼 노출.
 - **지식 탭(`/knowledge`, 2026-07-07 추가)**: `.txt`/`.md`/`.pdf`/`.docx`/`.hwpx` 파일을 내 PC에서 선택해 업로드하면 대/중/소분류(선택 입력) 메타데이터와 함께 `backend/rag/api.py`로 전송 → 서버가 저장·텍스트 추출·재색인(청킹→임베딩→ChromaDB)까지 수행하고 결과(청크 수)를 반환. 색인된 문서 목록(분류 배지 + 청크 수)을 조회해 보여줌. **RAG API 서버(uvicorn, 8000번 포트)가 떠 있어야 동작** — 3장 참고. curl/Python `requests`로 업로드·목록 조회 API 검증 완료(한글 파일명·카테고리, PDF/DOCX/HWPX 실제 파일 포함).
 - **보고서 탭(`/reports`, 2026-07-08 추가)**: 서식(계획보고서/결과보고서/업무보고/보도자료) 선택 → 제목·간단한 내용 입력 + 참고 파일(txt/md/csv/hwp/hwpx/docx, 최대 3개) 첨부 → Claude가 서식 목차에 맞춰 본문 JSON 생성(개조식, 서식별 작성 지침 자동 반영) → 섹션별 편집·표 위치 조정·미리보기 → 진짜 `.hwpx` 파일 다운로드(한글에서 열림). API 키 없으면 대체 생성기로 흐름 유지. 서식 추가는 `backend/report/templates/`에 마커 규약을 지킨 hwpx(+지침 md) 파일만 넣으면 됨 — 코드 수정 불필요. **엔진(조립·추출·프롬프트)은 업무 PC에서 오프라인 검증 완료, FastAPI 라우터 실행 검증은 개발 PC에서 필요** (venv에서 `uvicorn main:app` 후 탭 전체 흐름 확인).
+- **'할 일' 탭(`/todos`, 2026-07-11 추가) — 티켓 기반 칸반 보드**: 기존의 완료 체크만 되는 평면 리스트를 좌측 Backlog 사이드바 + 우측 3컬럼(TODO/In Progress/Done) 보드로 교체. 티켓 CRUD(제목·설명·우선순위·계획시작일·계획종료일), 네이티브 HTML5 드래그앤드롭으로 컬럼 이동·순서 변경, 검색, "이번주 업무"/"일정 초과 업무" 필터. 컬럼 이동에 따라 **시작일(startedAt)·종료일(completedAt)은 서버가 자동 기록**(TODO 진입 시 시작일, DONE 진입 시 종료일, 역방향 이동 시 초기화) — 계획일(사용자 입력)과 실제일(시스템 기록)을 분리 관리. Done 컬럼은 종료일 기준 24시간 이내 티켓만 노출(그 이후는 삭제하지 않고 DB에만 남음). 상세는 [docs/PRD.md](docs/PRD.md) 참고.
 
 ---
 
 ## 6. 중요한 한계 / 미구현 (사실 기반)
 
 - **인증은 2026-07-10부터 진짜다.** `backend/auth/`가 아이디+비번(사람별 계정, pbkdf2 해시)으로 검사하고 토큰을 발급하며, `AuthMiddleware`가 `/api/rag`·`/api/report`·`/api/store`를 토큰 없이는 401로 막는다. 공개 회원가입은 없고 계정은 `auth.manage add` CLI로 만든다. (옛 `mockAuth`는 제거됨.) **배포 주의**: 보안 미들웨어가 `RSG_ALLOWED_HOSTS`(응답 허용 도메인)를 요구 — 미설정 시 모든 요청 400. 계정 자체가 없으면 아무도 못 들어간다.
-- 일정/할 일(전체 화면)/메모(전체 화면)/설정 — 아직 `ComingSoonPage` 자리표시자만 있고 실제 화면 없음. (지식 탭 2026-07-07, 보고서·AI채팅·에이전트 탭 2026-07-08부터 실제 동작함.)
+- 설정만 아직 `ComingSoonPage` 자리표시자. 일정·할 일·메모는 `WorkspacePage`(워크스페이스 셸)로 실제 구현됨 — 상세는 [docs/PRD-Calendar.md](docs/PRD-Calendar.md)(일정·메모), [docs/PRD.md](docs/PRD.md)(할 일 칸반 보드) 참고.
+- **할 일 칸반의 알려진 제한(2026-07-11)**: Done에서 24시간이 지난 티켓은 보드에서만 숨겨지고 자동 삭제 배치는 없음(DB에 계속 남음). 기존에 있던 평면 할 일 데이터(`/api/store/todos` KV, `ground-todos` localStorage 이관분)는 신규 `tickets` 테이블로 마이그레이션하지 않음 — 새 보드는 빈 상태로 시작한다. 백엔드의 범용 KV 스토어(`backend/store/`)에 남아있는 `todos` 키는 더 이상 프론트에서 읽지 않지만 엔드포인트 자체는 정리하지 않고 그대로 둠.
 - AI 채팅/에이전트(회계챗)는 지식 탭에 올린 문서를 근거로만 답한다. 답변 생성엔 `ANTHROPIC_API_KEY` 필요(없으면 근거 조각만 보여주는 fallback). 대화 기록은 저장되지 않음(새로고침 시 초기화), 답변 마크다운은 아직 서식 렌더링 없이 줄바꿈만 보존.
 - 문서 업로드는 `.txt`/`.md`/`.pdf`/`.docx`/`.hwpx` 가능(2026-07-07 확장). XLSX, 옛 바이너리 `.hwp`(구버전, hwpx 아님), 이미지 기반 스캔 PDF(OCR 필요)는 아직 미지원.
 - 접근성 점검은 자동 검사 수준(아이콘 버튼 `aria-label`)만 했고, 스크린리더 수동 청취·전체 키보드 탭 순서 감사는 하지 않음.
@@ -176,6 +181,7 @@ backend/
 
 ## 9. 변경 이력 (AGENT.md 자체)
 
+- 2026-07-11: **'할 일' 탭 — 티켓 기반 칸반 보드 구현.** 사용자가 참고 저장소(`claude-code-expert/todo-app`)의 PRD/REQUIREMENTS를 근거로 MVP 범위(FR-001~FR-008)를 제시 → 이 프로젝트 스택(FastAPI+SQLite, Vite+React JS)에 맞춰 [docs/PRD.md](docs/PRD.md) 작성 후 구현. **백엔드**: 신규 `backend/todo/`(`store.py`=SQLite `tickets` 테이블, position은 REAL로 두고 두 카드 사이 삽입 시 `(prev+next)/2`·간격<1이면 1024 간격 재정렬; `api.py`=`POST/GET/PATCH/DELETE /api/todo/tickets[/{id}]` + `PATCH /api/todo/tickets/{id}/move`가 상태·순서 변경과 시작일/종료일 자동화를 함께 처리). `main.py` 라우터 등록 + `auth/api.py` `PROTECTED_PREFIXES`에 `/api/todo` 추가. **프론트**: 신규 `src/ticketApi.js`, `src/pages/workspace/ticketUtils.js`(이번 주 범위·날짜 포맷), `TodosPanel.jsx`를 평면 리스트→칸반 보드로 전면 교체(Backlog 사이드바+3컬럼+상세모달, 네이티브 HTML5 DnD, 신규 라이브러리 없음 — `docs/PRD-Calendar.md`의 "의존성 추가 금지" 컨벤션 계승). `WorkspacePage.jsx`는 더 이상 `useServerState('todos', ...)`를 쓰지 않음(티켓은 전용 백엔드가 진실의 원천). `MeetingPage.jsx`의 액션 아이템 추가 기능도 `appendToStore('todos', ...)`(구 KV 스토어) 대신 `createTicket()`으로 전환. **버그 발견 및 수정**: `vite.config.js`의 dev 프록시가 `/api/auth`·`/api/rag`·`/api/report`·`/api/store`만 명시돼 있고 `/api/meeting`·`/api/study`·`/api/todo`가 누락돼 있었음(CLAUDE.md는 `/api/*` 전체를 프록시한다고 문서화했지만 실제 코드는 기능 추가 때마다 한 줄씩 나열하는 방식이라 계속 빠뜨리기 쉬웠음) → 접두어 하나(`/api`)로 단순화해 근본 수정. 검증: 백엔드 API 5종(생성/조회/수정/삭제/이동, 우선순위·날짜 검증 에러 포함) curl로 직접 확인, Playwright로 로그인→보드 진입→티켓 생성→드래그(Backlog→TODO, 시작일 자동 기록 확인)→상세 모달→삭제까지 전체 플로우 스크린샷 확보, `npm test`(11개) 통과. 검증용으로 만든 임시 계정(`qa_ticket_test`, `qa_ticket_ui`)과 테스트 티켓은 작업 후 정리함. **미구현**: Done 24시간 경과 티켓 자동 삭제, 기존 평면 할 일 데이터 마이그레이션(7장 참고).
 - 2026-07-11: **공부 노트 — 노션식 리치 에디터(TipTap) 도입.** 마크다운 textarea+미리보기 → WYSIWYG 리치 에디터로 교체(사용자가 "색·볼드·표" 원함, 큰 라이브러리 도입 수락). **의존성 추가**: TipTap v3(`@tiptap/react`·`pm`·`starter-kit` + `extension-table`(TableKit) + `extension-text-style`(TextStyle/Color) + `extension-highlight`) — `package.json` `latest` 정책과 달리 lockfile로 고정됨. 프론트 신규 `src/pages/study/RichEditor.{jsx,css}`(툴바=굵게·기울임·밑줄·취소선·제목·목록·인용·코드·글자색·형광펜·표 삽입/행·열/삭제, `editable=false`면 읽기전용 뷰로 재사용). `StudyPage.jsx` edit/view가 textarea·`renderMarkdown` 대신 `<RichEditor>` 사용. **저장 형식 마크다운→HTML**(`content`에 HTML 저장). **보안**: 뷰는 `dangerouslySetInnerHTML` 대신 읽기전용 TipTap으로 렌더(ProseMirror가 스키마 밖 태그·스크립트 제거 → XSS 안전). **레거시 호환**: content가 HTML 아니면(`<`로 시작 안 하면) `src/markdown.js`의 `renderMarkdown`으로 1회 변환(파일 유지). 백엔드 `study/store.py`: `study_notes.plain` 컬럼 신규(+PRAGMA 마이그레이션), 저장 시 `_strip_html(content)`로 순수 텍스트 생성, **검색·미리보기·스니펫을 content(HTML) 대신 plain 기준**으로(태그·속성어 `color`/`span` 오탐 방지). `api.py` `CONTENT_LIMIT` 100k→500k(HTML 부피). 검증: 백엔드 실동작(HTML 저장→plain 검색 매칭, `color` 오탐 0건, 표 HTML 보존)·TipTap 명령어 헤드리스 확인(표·색·형광펜 HTML 출력)·build/test(11) 통과. **주의**: StudyPage 청크가 490KB(gzip 152KB)로 커짐(lazy 로드라 /study 방문 시에만). **범위 밖**: 이미지 삽입, 실시간 협업.
 - 2026-07-11: **공부 노트 — 분류(카테고리) 먼저 만들기 흐름 추가.** 노트를 만들며 과목을 자유입력하던 방식 → "분류를 먼저 만들고 그 안에서 노트 시작"(노션식)으로 변경. 사용자 확정: 노트는 분류 필수(목록에서 선택), 분류 삭제는 비어 있을 때만. 백엔드: `study_subjects(id,name,created_at)` 표 신규 + `GET/POST /api/study/subjects`·`DELETE /api/study/subjects/{id}`(노트 있으면 409). **라우트 순서 주의**: `/subjects`를 `/{note_id}`보다 먼저 선언(안 그러면 "subjects"를 int로 파싱 시도). 노트 저장 시 subject 필수(빈값 400) + `_ensure_subject`로 분류 자동 등록. 프론트: 목록=분류별 보드(빈 분류 포함)+"분류 추가"+컬럼별 "+노트"+컬럼 삭제, 편집=과목 자유입력 → 분류 선택 드롭다운. 검증: 분류 CRUD·삭제 규칙·라우트 충돌·필수분류 백엔드 통과, build/test(11) 통과.
 - 2026-07-11: **공부 노트 도구로 방향 전환 + 재구현(AI 미사용).** 처음엔 "공부 정리 에이전트"(Claude가 요약·마인드맵 생성, 아래 이력 참고)로 1차 구현했으나, 사용자가 목적을 "시험용 정리가 아니라 노션처럼 내 지식을 모아두는 도구 — 에디터로 쓰거나 파일 넣고 / 분류해 저장 / 검색해 찾기"로 재정의. **Claude·임베딩을 전부 제거**하고 `backend/study/` + `src/pages/study/`를 "노트 CRUD + 파일 첨부 + 키워드 검색"으로 개조. AI 키가 필요 없어 로컬에서 end-to-end 실검증 완료(회의록·기존 study는 유효 키가 없어 로컬 검증 불가였던 것과 대비). 확정 사항(사용자 선택): 마크다운 에디터+실시간 미리보기(경량 파서 `src/markdown.js` 직접 구현, 외부 라이브러리 없음), 파일은 원본 보관+텍스트 추출해 검색, 과목(단일)+태그(다중) 2단 분류, 과목별 보드 뷰(노션 참고). 백엔드: `study/analyzer.py` **삭제**, `store.py`=`study_notes(id,title,subject,tags,content(md),created_at,updated_at)` + `study_files(id,note_id,filename,stored_name,size,extracted_text,created_at)` 표(첨부 원본은 `config.DATA_DIR/study_files/`, 저장명은 `{note_id}_{uuid}`로 **서버 생성**→경로 탈출 차단), `search_notes`=제목·본문·태그·첨부텍스트 LIKE 검색, api=`GET /api/study?q=`(목록/검색)·`GET/POST/PUT/DELETE /api/study[/{id}]`·`POST /api/study/{id}/files`·`GET/DELETE /api/study/files/{fid}`(다운로드는 octet-stream+RFC5987 파일명). `extractors.py`·`security.py`(`MAX_STUDY_UPLOAD_BYTES`)·`main.py`·`PROTECTED_PREFIXES`는 유지. 프론트: `markdown.js`(escape 먼저→서식 변환, XSS 안전), `studyApi.js`(CRUD/검색/파일, 다운로드는 fetch+authHeaders→blob), `StudyPage.jsx`(list=검색창+과목 보드 / edit=마크다운 2단(입력·미리보기)+과목·태그 datalist+파일 첨부 / view=렌더+첨부 다운로드), `agentsConfig` 카드 문구 "공부 노트"로 변경. 검증: 백엔드 로그인 토큰으로 생성→수정→검색(본문·태그·첨부내용 3종)→첨부·다운로드(바이트 일치)→경로탈출 차단→삭제(디스크 정리) 전부 통과, 마크다운 XSS/인용문 확인, build/test(11) 통과. **범위 밖: 퀴즈/용어집/복습일정, 리치 WYSIWYG 에디터, 임베딩(semantic) 검색.**

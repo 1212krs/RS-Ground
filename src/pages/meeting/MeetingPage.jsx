@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { Menu, Sparkles, FileText, Trash2, ChevronLeft, CheckCircle2, CalendarPlus, BookOpen } from 'lucide-react'
 import { analyzeMeeting, listMeetings, getMeeting, removeMeeting, appendToStore } from '../../meetingApi.js'
+import { createTicket } from '../../ticketApi.js'
 import MindMap from './MindMap.jsx'
 import './MeetingPage.css'
 
@@ -97,18 +98,18 @@ export default function MeetingPage() {
   const addActions = async () => {
     const items = [...checkedActions].map((i) => result.analysis.action_items[i])
     if (!items.length) return
-    const todos = items.map((a, k) => ({
-      id: `mt-${Date.now()}-${k}`,
-      title: `[회의] ${a.text}${a.owner ? ` (담당: ${a.owner})` : ''}`,
-      project: '회의',
-      due: a.due || '',
-      done: false,
-      priority: 'normal',
-    }))
+    // due가 'YYYY-MM-DD' 형식이면 계획종료일로, 아니면 설명에 원문 그대로 남긴다
+    // (회의 분석 결과의 날짜 표기가 자유 형식일 수 있어 파싱을 강제하지 않는다).
+    const isIsoDate = (s) => /^\d{4}-\d{2}-\d{2}$/.test(s || '')
     try {
-      await appendToStore('todos', todos)
+      await Promise.all(items.map((a) => createTicket({
+        title: `[회의] ${a.text}${a.owner ? ` (담당: ${a.owner})` : ''}`,
+        description: !isIsoDate(a.due) && a.due ? `기한: ${a.due}` : '',
+        priority: 'MEDIUM',
+        planned_end_date: isIsoDate(a.due) ? a.due : null,
+      })))
       setAddedActions(true)
-      notify(`할 일 ${todos.length}개를 홈에 추가했습니다.`)
+      notify(`할 일 ${items.length}개를 보드에 추가했습니다.`)
     } catch (err) {
       notify(`추가 실패: ${err.message}`, 'error')
     }

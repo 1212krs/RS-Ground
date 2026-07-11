@@ -27,7 +27,7 @@ from security import require_max_len
 router = APIRouter(prefix="/api/auth")
 
 # 문지기가 검사하는 경로들. 이 접두어로 시작하는 요청은 로그인(토큰)이 필요하다.
-PROTECTED_PREFIXES = ("/api/rag", "/api/report", "/api/store", "/api/meeting", "/api/study")
+PROTECTED_PREFIXES = ("/api/rag", "/api/report", "/api/store", "/api/meeting", "/api/study", "/api/todo")
 
 
 def _bearer(authorization: str | None) -> str | None:
