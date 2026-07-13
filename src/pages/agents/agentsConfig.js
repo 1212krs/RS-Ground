@@ -1,4 +1,4 @@
-import { Calculator, ScrollText, ClipboardList, GraduationCap } from 'lucide-react'
+import { Calculator, PiggyBank, ScrollText, ClipboardList, GraduationCap } from 'lucide-react'
 
 // 앱형 에이전트: 채팅(scope)이 아니라 자기 전용 화면(route)을 여는 에이전트.
 export const APP_AGENTS = [
@@ -31,6 +31,14 @@ export const AGENTS = [
     icon: Calculator,
     accent: '#AEE63E',
     desc: '지방회계실무 교재를 근거로 회계·계약·지출 질문에 답합니다.',
+  },
+  {
+    id: 'budget',
+    name: '예산챗',
+    scope: '예산',          // category_l1 필터
+    icon: PiggyBank,
+    accent: '#F5A623',
+    desc: '지방예산실무 교재를 근거로 예산 편성·이월·전용 질문에 답합니다.',
   },
 ]
 

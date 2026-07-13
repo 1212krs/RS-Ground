@@ -8,6 +8,14 @@ import './ChatPage.css'
 //   /chat                         → AI챗 (전체 문서 검색)
 //   /chat?scope=회계&label=회계챗  → 회계챗 (회계 분야만 검색)
 // 임베딩 창고는 같고, category_l1 필터만 다르다.
+
+// 첫 화면 추천 질문: scope(대분류)별로 다르게 보여준다. ''는 전체 AI챗.
+const SUGGESTIONS = {
+  '회계': ['수의계약이 가능한 경우는?', '지출원인행위란 무엇인가?', '예정가격은 어떻게 결정하나?'],
+  '예산': ['예산 편성 절차는 어떻게 되나?', '예산의 이용과 전용의 차이는?', '추경 예산은 언제 편성하나?'],
+  '': ['이 프로젝트의 기술 스택은?', '지식 탭은 어떻게 동작하나?'],
+}
+
 export default function ChatPage() {
   const { onMenu } = useOutletContext()
   const [params] = useSearchParams()
@@ -51,9 +59,7 @@ export default function ChatPage() {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() }
   }
 
-  const suggestions = scope === '회계'
-    ? ['수의계약이 가능한 경우는?', '지출원인행위란 무엇인가?', '예정가격은 어떻게 결정하나?']
-    : ['이 프로젝트의 기술 스택은?', '지식 탭은 어떻게 동작하나?']
+  const suggestions = SUGGESTIONS[scope] || SUGGESTIONS['']
 
   return (
     <div className="ai">
