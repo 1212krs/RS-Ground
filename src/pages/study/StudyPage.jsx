@@ -215,7 +215,7 @@ export default function StudyPage() {
       <header className="st-head">
         <button className="oa-icon mobile-only" onClick={onMenu} aria-label="메뉴"><Menu size={20} /></button>
         <div>
-          <h1>공부 노트</h1>
+          <h1>노트</h1>
           <p className="st-sub">분류를 먼저 만들고, 그 안에서 노트를 작성해 과목별로 모으고 검색합니다.</p>
         </div>
       </header>

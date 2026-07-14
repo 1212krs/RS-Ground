@@ -12,7 +12,7 @@ export const APP_AGENTS = [
   },
   {
     id: 'study',
-    name: '공부 노트',
+    name: '노트',
     route: '/study',
     icon: GraduationCap,
     accent: '#1FA25A',
