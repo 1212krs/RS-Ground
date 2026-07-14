@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { useOutletContext, useSearchParams } from 'react-router-dom'
 import { Menu, Send, FileText, Sparkles } from 'lucide-react'
-import { chat } from '../../ragApi.js'
+import { chatStream } from '../../ragApi.js'
+import { renderMarkdown } from '../../markdown.js'
 import './ChatPage.css'
 
 // 하나의 채팅 화면이 URL 파라미터로 두 모드를 겸한다.
@@ -35,21 +36,31 @@ export default function ChatPage() {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
   }, [messages, loading])
 
+  // 대화 배열의 '마지막' 메시지(=스트리밍 중인 어시스턴트 말풍선)만 부분 갱신한다.
+  const patchLast = (patch) => setMessages((m) =>
+    m.map((msg, i) => (i === m.length - 1 ? { ...msg, ...(typeof patch === 'function' ? patch(msg) : patch) } : msg)))
+
   const send = async () => {
     const question = input.trim()
     if (!question || loading) return
     setInput('')
-    setMessages((m) => [...m, { role: 'user', text: question }])
+    // 사용자 질문 + 곧 스트리밍으로 채워질 빈 어시스턴트 말풍선을 함께 추가한다.
+    setMessages((m) => [...m,
+      { role: 'user', text: question },
+      { role: 'assistant', text: '', sources: [], engine: 'ai' },
+    ])
     setLoading(true)
     try {
-      const res = await chat({ question, categoryL1: scope, scopeLabel: scope })
-      setMessages((m) => [...m, {
-        role: 'assistant', text: res.answer, sources: res.sources || [], engine: res.engine,
-      }])
+      const { engine } = await chatStream(
+        { question, categoryL1: scope, scopeLabel: scope },
+        {
+          onSources: (sources, eng) => patchLast({ sources, engine: eng }),
+          onDelta: (text) => patchLast((msg) => ({ text: msg.text + text })),
+        },
+      )
+      patchLast({ engine })
     } catch (err) {
-      setMessages((m) => [...m, {
-        role: 'assistant', text: `답변을 가져오지 못했습니다: ${err.message}`, sources: [], engine: 'error',
-      }])
+      patchLast({ text: `답변을 가져오지 못했습니다: ${err.message}`, engine: 'error' })
     } finally {
       setLoading(false)
     }
@@ -87,7 +98,11 @@ export default function ChatPage() {
         {messages.map((m, i) => (
           <div key={i} className={`ai-msg ai-msg-${m.role}`}>
             <div className="ai-bubble">
-              <div className="ai-text">{m.text}</div>
+              {m.role === 'assistant'
+                ? (m.text
+                    ? <div className="ai-text ai-md" dangerouslySetInnerHTML={{ __html: renderMarkdown(m.text) }} />
+                    : <div className="ai-typing"><span></span><span></span><span></span></div>)
+                : <div className="ai-text">{m.text}</div>}
               {m.role === 'assistant' && m.sources?.length > 0 && (
                 <details className="ai-sources">
                   <summary>근거 {m.sources.length}개{m.engine === 'fallback' ? ' (AI 답변 미사용)' : ''}</summary>
@@ -105,12 +120,6 @@ export default function ChatPage() {
             </div>
           </div>
         ))}
-
-        {loading && (
-          <div className="ai-msg ai-msg-assistant">
-            <div className="ai-bubble ai-typing"><span></span><span></span><span></span></div>
-          </div>
-        )}
       </div>
 
       <div className="ai-inputbar">

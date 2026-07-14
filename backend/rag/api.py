@@ -6,15 +6,17 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from dotenv import load_dotenv
 from fastapi import Body, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from . import config
-from .chat import answer_question
+from .chat import answer_question, stream_answer_question
 from .chunker import chunk_directory, write_chunks_jsonl
 from .embedder import EmbeddingCache, embed_passages
 from .extractors import PLAIN_TEXT_SUFFIXES, SUPPORTED_SUFFIXES
@@ -124,9 +126,8 @@ async def upload_document(
     return {"source": source, "chunk_count": my_chunk_count, "total_chunks": len(chunks)}
 
 
-@app.post("/api/rag/chat")
-def chat(payload: dict = Body(...)):
-    """근거 기반 질의응답. category_l1을 주면 그 분야 문서만 검색한다(예: '회계'=회계챗, 없으면 전체=AI챗)."""
+def _parse_chat_payload(payload: dict) -> tuple[str, str | None, int, str | None]:
+    """/chat·/chat/stream 공통 입력 검증. (question, category_l1, top_k, scope_label) 반환."""
     question = (payload.get("question") or "").strip()
     if not question:
         raise HTTPException(400, "질문을 입력하세요.")
@@ -138,7 +139,39 @@ def chat(payload: dict = Body(...)):
     if scope_label:
         require_max_len(scope_label, "scope_label", 80)
     top_k = clamp_int(payload.get("top_k"), config.TOP_K_DEFAULT, 1, 20)
+    return question, category_l1, top_k, scope_label
+
+
+@app.post("/api/rag/chat")
+def chat(payload: dict = Body(...)):
+    """근거 기반 질의응답(일괄). category_l1을 주면 그 분야 문서만 검색한다(예: '회계'=회계챗, 없으면 전체=AI챗)."""
+    question, category_l1, top_k, scope_label = _parse_chat_payload(payload)
     return answer_question(question, category_l1=category_l1, top_k=top_k, scope_label=scope_label)
+
+
+@app.post("/api/rag/chat/stream")
+def chat_stream(payload: dict = Body(...)):
+    """근거 기반 질의응답(스트리밍). 답변을 SSE(text/event-stream)로 토큰 단위 전송한다.
+
+    각 SSE 줄은 `data: {json}\\n\\n` 형식이며 json.type 은 sources|delta|done|error.
+    """
+    question, category_l1, top_k, scope_label = _parse_chat_payload(payload)
+
+    def event_source():
+        try:
+            for ev in stream_answer_question(question, category_l1=category_l1,
+                                             top_k=top_k, scope_label=scope_label):
+                yield "data: %s\n\n" % json.dumps(ev, ensure_ascii=False)
+        except Exception as ex:  # 검색/임베딩 단계 등 스트림 시작 전 오류
+            err = {"type": "error", "message": "%s: %s" % (type(ex).__name__, ex)}
+            yield "data: %s\n\n" % json.dumps(err, ensure_ascii=False)
+
+    return StreamingResponse(
+        event_source(),
+        media_type="text/event-stream",
+        # 프록시(nginx 등)가 SSE를 모아두지 않고 즉시 흘려보내도록.
+        headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"},
+    )
 
 
 @app.get("/api/rag/documents")

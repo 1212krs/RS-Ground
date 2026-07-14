@@ -1,5 +1,5 @@
 // 아주 작은 마크다운 → HTML 변환기 (외부 라이브러리 없이 직접 구현).
-// 지원: 제목(#~###), 굵게(**), 기울임(*), 인라인 코드(`), 코드펜스(```), 인용(>), 목록(-, 1.), 링크([]()).
+// 지원: 제목(#~###), 굵게(**), 기울임(*), 인라인 코드(`), 코드펜스(```), 인용(>), 목록(-, 1.), 링크([]()), 표(| … |).
 //
 // 보안(중요): 사용자가 쓴 원문을 dangerouslySetInnerHTML로 그리므로,
 // 텍스트 조각을 태그로 감싸기 전에 반드시 HTML 특수문자를 먼저 escape 한다.
@@ -28,6 +28,25 @@ function inlineFmt(raw) {
   return t
 }
 
+// --- 표(GFM table) 판별/파싱 헬퍼 ---
+// 한 줄을 셀 배열로 자른다. 양 끝의 파이프(|)는 있으면 제거한다. 예) "| a | b |" → ['a','b']
+function splitRow(line) {
+  let s = line.trim()
+  if (s.startsWith('|')) s = s.slice(1)
+  if (s.endsWith('|')) s = s.slice(0, -1)
+  return s.split('|').map((c) => c.trim())
+}
+// 표의 두 번째 줄(구분선). 각 칸이 --- / :--- / ---: / :---: 형태여야 한다.
+function isTableSeparator(line) {
+  const s = (line || '').trim()
+  if (!s.includes('-')) return false
+  return /^\|?\s*:?-{1,}:?\s*(\|\s*:?-{1,}:?\s*)*\|?$/.test(s)
+}
+// 표의 데이터/헤더 줄로 볼 수 있는지(파이프를 포함하고 빈 줄이 아님).
+function isTableRow(line) {
+  return line.trim() !== '' && line.includes('|')
+}
+
 export function renderMarkdown(src) {
   const lines = (src || '').split('\n')
   const html = []
@@ -39,7 +58,9 @@ export function renderMarkdown(src) {
     if (listType) { html.push(`</${listType}>`); listType = null }
   }
 
-  for (const line of lines) {
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]
+
     // 코드펜스 토글 (내용은 서식 없이 escape만)
     if (line.trim().startsWith('```')) {
       if (inCode) { html.push(`<pre><code>${escapeHtml(codeBuf.join('\n'))}</code></pre>`); codeBuf = []; inCode = false }
@@ -47,6 +68,24 @@ export function renderMarkdown(src) {
       continue
     }
     if (inCode) { codeBuf.push(line); continue }
+
+    // 표: 현재 줄이 헤더처럼 보이고 바로 다음 줄이 구분선(|---|---|)이면 표로 처리
+    if (isTableRow(line) && isTableSeparator(lines[i + 1])) {
+      closeList()
+      const header = splitRow(line)
+      const rows = []
+      let j = i + 2
+      while (j < lines.length && isTableRow(lines[j]) && !isTableSeparator(lines[j])) {
+        rows.push(splitRow(lines[j])); j++
+      }
+      html.push('<table><thead><tr>' + header.map((c) => `<th>${inlineFmt(c)}</th>`).join('') + '</tr></thead>')
+      if (rows.length) {
+        html.push('<tbody>' + rows.map((r) => '<tr>' + r.map((c) => `<td>${inlineFmt(c)}</td>`).join('') + '</tr>').join('') + '</tbody>')
+      }
+      html.push('</table>')
+      i = j - 1   // 표가 끝난 다음 줄부터 바깥 루프가 이어받음
+      continue
+    }
 
     // 제목
     const h = line.match(/^(#{1,3})\s+(.*)$/)

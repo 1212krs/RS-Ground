@@ -118,6 +118,111 @@ def _call_claude(question: str, hits: list[dict], scope_label: str | None) -> st
     return "".join(b["text"] for b in resp["content"] if b["type"] == "text").strip()
 
 
+def _stream_claude(question: str, hits: list[dict], scope_label: str | None):
+    """Claude를 스트리밍 모드로 호출해 답변 텍스트 조각을 하나씩 내보낸다(제너레이터).
+
+    _call_claude 와 요청 본문은 같고 "stream": True 만 추가한다. 응답은 SSE라서
+    한 줄씩 읽어 'content_block_delta'의 text_delta 만 뽑아 yield 한다.
+    연결/HTTP 오류는 RuntimeError로 올려 호출부가 fallback 하도록 한다.
+    """
+    key = _api_key()
+    if not key:
+        raise RuntimeError("ANTHROPIC_API_KEY 없음")
+    body = {
+        "model": MODEL,
+        "max_tokens": 1500,
+        "system": _system_prompt(scope_label),
+        "messages": [{"role": "user", "content": _user_prompt(question, hits)}],
+        "stream": True,
+    }
+    http_req = urllib.request.Request(
+        API_URL,
+        data=json.dumps(body).encode("utf-8"),
+        headers={"content-type": "application/json",
+                 "anthropic-version": "2023-06-01",
+                 "x-api-key": key},
+        method="POST",
+    )
+    try:
+        resp = urllib.request.urlopen(http_req, timeout=120, context=_ssl_context())
+    except urllib.error.HTTPError as e:
+        detail = e.read().decode("utf-8", "ignore")
+        try:
+            detail = json.loads(detail)["error"]["message"]
+        except Exception:
+            detail = detail[:200]
+        raise RuntimeError("Claude API 오류(HTTP %d): %s" % (e.code, detail))
+
+    with resp:
+        for raw in resp:                      # HTTPResponse는 줄 단위로 순회 가능
+            line = raw.decode("utf-8", "ignore").strip()
+            if not line.startswith("data:"):
+                continue
+            payload = line[5:].strip()
+            if not payload:
+                continue
+            try:
+                obj = json.loads(payload)
+            except json.JSONDecodeError:
+                continue
+            kind = obj.get("type")
+            if kind == "content_block_delta":
+                delta = obj.get("delta") or {}
+                if delta.get("type") == "text_delta":
+                    text = delta.get("text", "")
+                    if text:
+                        yield text
+            elif kind == "error":
+                msg = (obj.get("error") or {}).get("message", "스트리밍 오류")
+                raise RuntimeError("Claude 스트리밍 오류: %s" % msg)
+
+
+def stream_answer_question(
+    question: str,
+    category_l1: str | None = None,
+    top_k: int = config.TOP_K_DEFAULT,
+    scope_label: str | None = None,
+):
+    """answer_question 의 스트리밍 버전(제너레이터).
+
+    이벤트 dict를 순서대로 yield 한다(api.py가 이를 SSE로 감싼다):
+      {"type":"sources", "engine", "sources"}  ← 검색 근거를 먼저 보냄(화면에 즉시 표시)
+      {"type":"delta",   "text"}               ← 답변 조각(여러 번)
+      {"type":"done",    "engine"}             ← 최종 engine("ai"|"fallback"|"no_results"|"error")
+    """
+    hits = _retrieve(question, category_l1, top_k)
+    sources = [{k: h[k] for k in ("n", "source", "chunk_index", "category_l1", "preview", "distance")}
+               for h in hits]
+
+    if not hits:
+        yield {"type": "sources", "engine": "no_results", "sources": []}
+        yield {"type": "delta",
+               "text": "관련된 내용을 지식 문서에서 찾지 못했습니다. 문서를 올렸는지, 검색 분야가 맞는지 확인해 주세요."}
+        yield {"type": "done", "engine": "no_results"}
+        return
+
+    # 근거는 첫 토큰을 기다리지 않고 먼저 내려보낸다.
+    yield {"type": "sources", "engine": "ai", "sources": sources}
+
+    streamed_any = False
+    try:
+        for chunk in _stream_claude(question, hits, scope_label):
+            streamed_any = True
+            yield {"type": "delta", "text": chunk}
+        yield {"type": "done", "engine": "ai"}
+    except Exception as ex:
+        print("[chat] 스트리밍 미사용(%s: %s) → 근거만 반환" % (type(ex).__name__, ex))
+        if streamed_any:
+            # 이미 일부가 나갔으면 전체 fallback로 덮지 않고 끊김만 알린다.
+            yield {"type": "delta", "text": "\n\n⚠️ 답변 생성이 중간에 중단되었습니다."}
+            yield {"type": "done", "engine": "error"}
+        else:
+            joined = "\n\n".join("[%d] (%s) %s" % (h["n"], h["source"], h["preview"]) for h in hits)
+            yield {"type": "delta",
+                   "text": "AI 답변 생성은 지금 사용할 수 없어, 질문과 가장 관련 있는 문서 근거만 보여드립니다:\n\n" + joined}
+            yield {"type": "done", "engine": "fallback"}
+
+
 def answer_question(
     question: str,
     category_l1: str | None = None,
