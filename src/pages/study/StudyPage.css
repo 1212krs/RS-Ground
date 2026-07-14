@@ -63,7 +63,12 @@
 .st-back:hover { color: #ededed; }
 
 /* ---- 편집(에디터) ---- */
-.st-editor { display: flex; flex-direction: column; gap: 12px; }
+/* .st-editor 가 화면의 남는 세로 공간을 모두 차지하고(flex:1), 그 안에서
+   리치 에디터 본문(.rte-content)이 늘어나도록 해 모니터 높이에 반응형으로 맞춘다.
+   min-height:0 은 flex 자식이 내용 때문에 넘치지 않고 내부 스크롤되도록 하는 안전장치. */
+.st-editor { display: flex; flex-direction: column; gap: 12px; flex: 1 1 auto; min-height: 0; }
+.st-editor > .rte { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+.st-editor > .rte .rte-content { flex: 1 1 auto; min-height: 240px; max-height: none; }
 .st-meta-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 6px; }
 .st-input { box-sizing: border-box; padding: 10px 13px; border-radius: 10px; border: 1px solid #2a2a2a; background: #121212; color: #ededed; font-size: 13px; font-family: inherit; }
 .st-input:focus { outline: none; border-color: #1FA25A; }
