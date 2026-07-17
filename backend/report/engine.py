@@ -30,8 +30,10 @@ import xml.etree.ElementTree as ET
 TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
 COMMON_GUIDE_PATH = TEMPLATES_DIR / "_공통지침.md"
 
-REQUIRED_MARKERS = ["{{TITLE}}", "{{OVERVIEW}}", "○ {{ITEM}}", "- {{SUB}}",
-                    "{{TBL_CAPTION}}", "{{TH}}", "{{TD}}"]
+# 필수 마커 — 없으면 서식 등록 거부. 그 외는 선택(있으면 features로 노출):
+#   {{OVERVIEW}}(개요 상자) · □ {{HEAD}}(대항목 단계) · 표 3종({{TBL_CAPTION}}/{{TH}}/{{TD}})
+REQUIRED_MARKERS = ["{{TITLE}}", "○ {{ITEM}}", "- {{SUB}}"]
+TABLE_MARKERS = ["{{TBL_CAPTION}}", "{{TH}}", "{{TD}}"]
 
 _tpl_cache: dict = {}
 
@@ -61,6 +63,13 @@ def analyze_template(path: Path) -> dict:
     if missing:
         raise ValueError("마커 누락: %s" % ", ".join(missing))
 
+    tbl_found = [m for m in TABLE_MARKERS if m in xml]
+    if tbl_found and len(tbl_found) != len(TABLE_MARKERS):
+        raise ValueError("표 마커 불완전(셋 다 있거나 셋 다 없어야 함): %s" % ", ".join(tbl_found))
+    features = {"overview": "{{OVERVIEW}}" in xml,
+                "table": bool(tbl_found),
+                "head": "□ {{HEAD}}" in xml}
+
     labels = []
     for m in re.finditer(r'<hp:tbl[^>]*rowCnt="1" colCnt="2".*?</hp:tbl>', xml, flags=re.S):
         cells = [t.strip() for t in re.findall(r"<hp:t>([^<]*)</hp:t>", m.group(0)) if t.strip()]
@@ -76,11 +85,13 @@ def analyze_template(path: Path) -> dict:
         if n_item != 1:
             raise ValueError("섹션 바 없는 서식은 ITEM 견본이 1개여야 함 (현재 %d개)" % n_item)
         labels = ["본문"]
+    if features["head"] and xml.count("□ {{HEAD}}") != n_item:
+        raise ValueError("HEAD 견본 %d개 ≠ ITEM 견본 %d개" % (xml.count("□ {{HEAD}}"), n_item))
 
     guide = gp.read_text(encoding="utf-8-sig").strip() if gp else ""
 
     info = {"id": path.stem, "name": path.stem, "path": str(path),
-            "sections": labels, "guide": guide}
+            "sections": labels, "features": features, "guide": guide}
     _tpl_cache[key] = info
     return info
 
@@ -193,6 +204,17 @@ def _fill_table(fragment: str, table: dict) -> str:
     return fragment[:ts] + new_tbl + fragment[te:]
 
 
+def _strip_lineseg_of(xml: str, needle: str) -> str:
+    """needle을 포함하는 문단의 줄배치 캐시만 제거 — 내용이 길어져도 겹치지 않게.
+    (제목 상자처럼 헤더 표 안에 있어 _strip_body_linesegs가 못 지우는 곳용)"""
+    i = xml.find(needle)
+    if i == -1:
+        return xml
+    s, e = _para_span(xml, i)
+    para = re.sub(r"<hp:linesegarray>.*?</hp:linesegarray>", "", xml[s:e], flags=re.S)
+    return xml[:s] + para + xml[e:]
+
+
 def _strip_body_linesegs(xml: str) -> str:
     """본문의 낡은 줄배치표(linesegarray) 제거 → 한글이 열 때 재계산 → 글자 겹침 방지.
 
@@ -212,6 +234,7 @@ def _strip_body_linesegs(xml: str) -> str:
 def form_to_doc(data: dict, tpl: dict) -> dict:
     """화면 폼 입력(JSON)을 조립용 문서 구조로 변환한다."""
     n = len(tpl["sections"])
+    feats = tpl.get("features", {})
 
     def parse_section(text: str):
         blocks = []
@@ -219,7 +242,11 @@ def form_to_doc(data: dict, tpl: dict) -> dict:
             t = line.strip()
             if not t:
                 continue
-            if t[0] in "-―":
+            if t[0] == "□":
+                # 서식에 □ 단계가 없으면 상위 항목(○)으로 강등
+                kind = "head" if feats.get("head") else "item"
+                blocks.append((kind, t.lstrip("□ ").strip()))
+            elif t[0] in "-―":
                 blocks.append(("sub", t.lstrip("-― ").strip()))
             else:
                 blocks.append(("item", t.lstrip("○ ").strip()))
@@ -231,7 +258,7 @@ def form_to_doc(data: dict, tpl: dict) -> dict:
         "overview": (data.get("overview") or "").strip(),
         "sections": [parse_section(raw[i] if i < len(raw) else "") for i in range(n)],
     }
-    if data.get("include_table"):
+    if data.get("include_table") and feats.get("table", True):
         tbl = data.get("table") or {}
         try:
             section = int(tbl.get("section", n))
@@ -253,15 +280,21 @@ def build_hwpx(doc: dict, tpl: dict) -> bytes:
         parts = {i.filename: zin.read(i.filename) for i in zin.infolist()}
         order = [i.filename for i in zin.infolist()]
     xml = parts["Contents/section0.xml"].decode("utf-8")
+    feats = tpl.get("features", {})
 
     # 항목 견본 추출
     s, e = _para_span(xml, xml.index("○ {{ITEM}}")); item_tpl = xml[s:e]
     s, e = _para_span(xml, xml.index("- {{SUB}}")); sub_tpl = xml[s:e]
+    head_tpl = ""
+    if feats.get("head"):
+        s, e = _para_span(xml, xml.index("□ {{HEAD}}")); head_tpl = xml[s:e]
 
-    # 표를 템플릿 고정 위치에서 잘라내 이동식 부품으로 확보
-    xml, cap_tpl, tbl_tpl = _extract_table_parts(xml)
+    # 표를 템플릿 고정 위치에서 잘라내 이동식 부품으로 확보 (표 지원 서식만)
+    cap_tpl = tbl_tpl = ""
+    if feats.get("table", True):
+        xml, cap_tpl, tbl_tpl = _extract_table_parts(xml)
 
-    table = doc.get("table")
+    table = doc.get("table") if tbl_tpl else None
     tbl_frag, tbl_at = "", 0
     if table:
         n = len(doc["sections"])
@@ -273,22 +306,31 @@ def build_hwpx(doc: dict, tpl: dict) -> bytes:
     for no, blocks in enumerate(doc["sections"], 1):
         frags = []
         for kind, text in blocks:
-            if kind == "sub":
+            if kind == "head" and head_tpl:
+                frags.append(head_tpl.replace("□ {{HEAD}}", "□ " + escape(text)))
+            elif kind == "sub":
                 frags.append(sub_tpl.replace("- {{SUB}}", "- " + escape(text)))
             else:
                 frags.append(item_tpl.replace("○ {{ITEM}}", "○ " + escape(text)))
         if no == tbl_at:
             frags.append(tbl_frag)
-        is_, ie = _para_span(xml, xml.index("○ {{ITEM}}"))
+        # 견본 문단 묶음(□?·○·-)을 통째로 실제 내용으로 교체
+        if head_tpl:
+            start, he = _para_span(xml, xml.index("□ {{HEAD}}"))
+            is_, ie = _para_span(xml, xml.index("○ {{ITEM}}", he))
+        else:
+            start, ie = _para_span(xml, xml.index("○ {{ITEM}}"))
         ss, se = _para_span(xml, xml.index("- {{SUB}}", ie))
-        xml = xml[:is_] + "".join(frags) + xml[se:]
+        xml = xml[:start] + "".join(frags) + xml[se:]
 
+    xml = _strip_lineseg_of(xml, "{{TITLE}}")
     xml = xml.replace("{{TITLE}}", escape(doc["title"]))
-    xml = xml.replace("{{OVERVIEW}}", escape(doc["overview"]))
+    if feats.get("overview", True):
+        xml = xml.replace("{{OVERVIEW}}", escape(doc["overview"]))
     xml = _strip_body_linesegs(xml)
 
     # 생성 후 검증: 잔여 마커·XML 문법
-    leftover = [m for m in ("{{TITLE}}", "{{OVERVIEW}}", "{{ITEM}}", "{{SUB}}",
+    leftover = [m for m in ("{{TITLE}}", "{{OVERVIEW}}", "{{HEAD}}", "{{ITEM}}", "{{SUB}}",
                             "{{TBL_CAPTION}}", "{{TH}}", "{{TD}}") if m in xml]
     if leftover:
         raise ValueError("잔여 마커: %s" % leftover)

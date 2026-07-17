@@ -16,12 +16,13 @@ const emptyDoc = (tpl) => ({
   rows: [],
 })
 
-// AI 응답(doc)을 편집 상태로 변환. 섹션 블록 배열 → 줄 단위 텍스트(하위 항목은 "- " 접두)
+// AI 응답(doc)을 편집 상태로 변환. 섹션 블록 배열 → 줄 단위 텍스트(대항목 "□ ", 하위 "- " 접두)
+const levelPrefix = { head: '□ ', sub: '- ' }
 const docToEdit = (doc, tpl) => ({
   title: doc.title || '',
   overview: doc.overview || '',
   sections: tpl.sections.map((_, i) =>
-    (doc.sections?.[i] || []).map((b) => (b.level === 'sub' ? '- ' : '') + b.text).join('\n')),
+    (doc.sections?.[i] || []).map((b) => (levelPrefix[b.level] || '') + b.text).join('\n')),
   includeTable: Boolean(doc.table),
   tableCaption: doc.table?.caption || '',
   tableSection: doc.table?.section || tpl.sections.length,
@@ -32,9 +33,11 @@ const docToEdit = (doc, tpl) => ({
 // 편집 상태의 섹션 텍스트를 미리보기용 블록으로 파싱
 const parseBlocks = (text) => (text || '').split('\n')
   .map((line) => line.trim()).filter(Boolean)
-  .map((line) => (line.startsWith('-') || line.startsWith('―')
-    ? { level: 'sub', text: line.replace(/^[-―]\s*/, '') }
-    : { level: 'item', text: line.replace(/^○\s*/, '') }))
+  .map((line) => {
+    if (line.startsWith('□')) return { level: 'head', text: line.replace(/^□\s*/, '') }
+    if (line.startsWith('-') || line.startsWith('―')) return { level: 'sub', text: line.replace(/^[-―]\s*/, '') }
+    return { level: 'item', text: line.replace(/^○\s*/, '') }
+  })
 
 export default function ReportsPage() {
   const { notify, onMenu } = useOutletContext()
@@ -57,6 +60,8 @@ export default function ReportsPage() {
   const [generating, setGenerating] = useState(false)
 
   const tpl = useMemo(() => templates.find((t) => t.id === tplId), [templates, tplId])
+  // 서식이 지원하는 기능(개요 상자·표·□ 대항목). 옛 응답엔 features가 없으므로 전부 지원으로 간주
+  const feats = tpl?.features || { overview: true, table: true, head: false }
 
   useEffect(() => {
     (async () => {
@@ -92,7 +97,7 @@ export default function ReportsPage() {
     setComposeMsg({ text: 'AI가 본문을 생성하는 중… (참고 파일 분석 포함, 수십 초 걸릴 수 있음)', tone: 'ok' })
     try {
       const out = await composeReport({
-        title: cTitle, brief: cBrief, template: tplId, includeTable: cTable, files: cFiles,
+        title: cTitle, brief: cBrief, template: tplId, includeTable: cTable && feats.table, files: cFiles,
       })
       setDoc(docToEdit(out.doc, tpl))
       const fileNote = out.files_used?.length ? ` (참고 자료 ${out.files_used.length}개 반영)` : ''
@@ -205,10 +210,12 @@ export default function ReportsPage() {
                 {cFiles.map((f) => <li key={f.name}>📎 {f.name} ({Math.round(f.size / 1024)}KB)</li>)}
               </ul>
             )}
-            <label className="rp-check">
-              <input type="checkbox" checked={cTable} onChange={(e) => setCTable(e.target.checked)} disabled={composing} />
-              표 포함하여 생성
-            </label>
+            {feats.table && (
+              <label className="rp-check">
+                <input type="checkbox" checked={cTable} onChange={(e) => setCTable(e.target.checked)} disabled={composing} />
+                표 포함하여 생성
+              </label>
+            )}
             <button className="rp-primary" onClick={handleCompose} disabled={composing}>
               <Sparkles size={15} /> {composing ? '생성 중…' : 'AI로 본문 생성'}
             </button>
@@ -219,9 +226,15 @@ export default function ReportsPage() {
             <h2><FilePenLine size={15} /> 문서 편집</h2>
             <label>문서 제목</label>
             <input value={doc.title} onChange={(e) => setDoc({ ...doc, title: e.target.value })} />
-            <label>개요</label>
-            <textarea rows={3} value={doc.overview} onChange={(e) => setDoc({ ...doc, overview: e.target.value })} />
-            <p className="rp-hint">한 줄 = 한 항목(○) · 줄 앞에 “-”를 붙이면 하위 항목(―)</p>
+            {feats.overview && (
+              <>
+                <label>개요</label>
+                <textarea rows={3} value={doc.overview} onChange={(e) => setDoc({ ...doc, overview: e.target.value })} />
+              </>
+            )}
+            <p className="rp-hint">{feats.head
+              ? '한 줄 = 한 항목 · 줄 앞 “□”는 대항목, “-”는 세부(―), 없으면 항목(○)'
+              : '한 줄 = 한 항목(○) · 줄 앞에 “-”를 붙이면 하위 항목(―)'}</p>
             {tpl?.sections.map((label, i) => (
               <div key={label + i} className="rp-section">
                 <div className="rp-section-label"><span className="rp-num">{i + 1}</span>{label}</div>
@@ -229,11 +242,13 @@ export default function ReportsPage() {
               </div>
             ))}
 
-            <label className="rp-check">
-              <input type="checkbox" checked={doc.includeTable} onChange={(e) => setDoc({ ...doc, includeTable: e.target.checked })} />
-              표 포함
-            </label>
-            {doc.includeTable && (
+            {feats.table && (
+              <label className="rp-check">
+                <input type="checkbox" checked={doc.includeTable} onChange={(e) => setDoc({ ...doc, includeTable: e.target.checked })} />
+                표 포함
+              </label>
+            )}
+            {feats.table && doc.includeTable && (
               <div className="rp-tablebox">
                 <label>표 제목</label>
                 <input value={doc.tableCaption} onChange={(e) => setDoc({ ...doc, tableCaption: e.target.value })} />
@@ -279,9 +294,11 @@ export default function ReportsPage() {
                   <div className="rp-doc-bar"><span>{i + 1}</span>{label}</div>
                   {blocks.length === 0 && <p className="rp-doc-empty">（내용 없음）</p>}
                   {blocks.map((b, j) => (
-                    b.level === 'sub'
-                      ? <p key={j} className="rp-doc-sub">- {b.text}</p>
-                      : <p key={j} className="rp-doc-item">○ {b.text}</p>
+                    b.level === 'head'
+                      ? <p key={j} className="rp-doc-head">□ {b.text}</p>
+                      : b.level === 'sub'
+                        ? <p key={j} className="rp-doc-sub">- {b.text}</p>
+                        : <p key={j} className="rp-doc-item">○ {b.text}</p>
                   ))}
                   {doc.includeTable && doc.tableSection === i + 1 && previewTable}
                 </div>

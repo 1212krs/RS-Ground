@@ -38,7 +38,8 @@ MAX_FILE_BYTES = MAX_REPORT_UPLOAD_BYTES
 @router.get("/templates")
 def templates():
     return [{"id": t["id"], "name": t["name"], "sections": t["sections"],
-             "has_guide": bool(t["guide"])} for t in list_templates()]
+             "features": t["features"], "has_guide": bool(t["guide"])}
+            for t in list_templates()]
 
 
 @router.get("/status")

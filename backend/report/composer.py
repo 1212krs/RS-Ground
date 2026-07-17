@@ -41,7 +41,7 @@ COMPOSE_SCHEMA = {
                 "items": {
                     "type": "object",
                     "properties": {
-                        "level": {"type": "string", "enum": ["item", "sub"]},
+                        "level": {"type": "string", "enum": ["head", "item", "sub"]},
                         "text": {"type": "string"},
                     },
                     "required": ["level", "text"],
@@ -88,24 +88,42 @@ def _ssl_context() -> ssl.SSLContext:
 
 def _compose_system(tpl: dict) -> str:
     labels = tpl["sections"]
+    feats = tpl.get("features", {})
     numbered = ", ".join("%d=%s" % (i + 1, lab) for i, lab in enumerate(labels))
+    if feats.get("head"):
+        rule_levels = (
+            "3) 항목은 3단계입니다. level='head'는 대항목(□), level='item'은 중간 항목(○), "
+            "level='sub'은 세부(―)입니다. head 아래에 관련 item을, item 아래에 보충 sub를 "
+            "배치합니다. 블록 수는 정해진 제한 없이 내용 분량에 맞게 정합니다.\n"
+        )
+    else:
+        rule_levels = (
+            "3) 각 섹션은 2~4개의 블록으로 구성합니다. level='item'은 상위 항목(○), "
+            "level='sub'은 하위 세부(―)입니다. sub는 바로 위 item을 보충합니다. "
+            "level='head'는 사용하지 않습니다.\n"
+        )
+    if feats.get("table", True):
+        rule_table = (
+            "5) table: 사용자가 표를 요청하면 4열(단계/주요 내용/추진 시기/담당 등) 표를 생성하고, "
+            "요청하지 않으면 null. table.section에는 표 내용이 가장 어울리는 섹션 번호(%s)를 지정합니다. "
+            "예: 추진 일정표는 계획·일정 성격의 섹션, 예산 내역은 행정사항 성격의 섹션.\n"
+        ) % numbered
+    else:
+        rule_table = "5) table: 이 서식은 표를 지원하지 않으므로 반드시 null로 둡니다.\n"
     base = (
         "당신은 대한민국 지방자치단체의 보고서를 작성하는 행정 전문가입니다. "
         "주어진 제목과 내용으로 개조식 '%s' 문서 내용을 생성합니다.\n"
         "규칙:\n"
         "1) 문체는 개조식 종결어미(~함, ~임, ~필요)를 사용합니다.\n"
         "2) sections 배열은 반드시 %d개이며 순서는 [%s] 목차에 대응합니다.\n"
-        "3) 각 섹션은 2~4개의 블록으로 구성합니다. level='item'은 상위 항목(○), "
-        "level='sub'은 하위 세부(―)입니다. sub는 바로 위 item을 보충합니다.\n"
+        "%s"
         "4) 핵심 항목은 '(구분) 내용' 형태로 시작하면 좋습니다. 예: '(소요예산) ...'.\n"
-        "5) table: 사용자가 표를 요청하면 4열(단계/주요 내용/추진 시기/담당 등) 표를 생성하고, "
-        "요청하지 않으면 null. table.section에는 표 내용이 가장 어울리는 섹션 번호(%s)를 지정합니다. "
-        "예: 추진 일정표는 계획·일정 성격의 섹션, 예산 내역은 행정사항 성격의 섹션.\n"
+        "%s"
         "6) 날짜는 '2026. 8.' 형식을 씁니다.\n"
         "7) 사용자가 제목을 제공하면 그 제목을 사용하되, 서식의 제목 규칙이 있으면 그에 맞게 다듬을 수 있습니다.\n"
         "8) 참고 자료가 제공되면 그 안의 사실관계·수치·명칭을 우선 활용합니다. "
         "참고 자료에 없는 구체적 수치를 지어내지 않습니다."
-    ) % (tpl["name"], len(labels), ", ".join(labels), numbered)
+    ) % (tpl["name"], len(labels), ", ".join(labels), rule_levels, rule_table)
     common = common_guide()
     if common:
         base += ("\n\n[공통 작성 지침 — 모든 보고서에 적용. 위 기본 규칙과 충돌하면 이 지침을 우선합니다]\n"
@@ -174,6 +192,12 @@ def _compose_llm(req: dict, tpl: dict) -> dict:
     n = len(tpl["sections"])
     secs = doc.get("sections") or []
     doc["sections"] = (secs + [[] for _ in range(n)])[:n]
+    if not tpl.get("features", {}).get("head"):
+        # □ 단계가 없는 서식에서 head가 나오면 상위 항목(○)으로 강등
+        for sec in doc["sections"]:
+            for b in sec:
+                if b.get("level") == "head":
+                    b["level"] = "item"
     if not req["include_table"]:
         doc["table"] = None
     return doc
@@ -238,6 +262,8 @@ def _compose_fallback(req: dict, tpl: dict) -> dict:
 
 def compose(req: dict, tpl: dict) -> tuple[str, dict, str]:
     """(engine, doc, fallback_사유) 반환. engine ∈ {"ai", "fallback"}."""
+    if not tpl.get("features", {}).get("table", True):
+        req = {**req, "include_table": False}  # 표 없는 서식은 표 요청 무시
     try:
         return "ai", _compose_llm(req, tpl), ""
     except Exception as ex:
