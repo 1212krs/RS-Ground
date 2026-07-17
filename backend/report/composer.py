@@ -25,8 +25,8 @@ from .engine import common_guide
 
 API_URL = "https://api.anthropic.com/v1/messages"
 MODEL = "claude-opus-4-8"
-FILE_CHAR_LIMIT = 6000    # 참고 파일 1개당 프롬프트 주입 한도
-TOTAL_CHAR_LIMIT = 15000  # 참고 파일 전체 한도
+FILE_CHAR_LIMIT = 10000   # 참고 파일 1개당 프롬프트 주입 한도
+TOTAL_CHAR_LIMIT = 24000  # 참고 파일 전체 한도
 
 # Claude 구조화 출력(JSON 스키마) — 응답이 반드시 이 모양이 되도록 강제
 COMPOSE_SCHEMA = {
@@ -92,14 +92,17 @@ def _compose_system(tpl: dict) -> str:
     numbered = ", ".join("%d=%s" % (i + 1, lab) for i, lab in enumerate(labels))
     if feats.get("sec"):
         rule_levels = (
-            "3) 먼저 사용자가 준 내용 전체를 분석해 이 보고에 맞는 핵심 목차를 직접 도출하고, "
-            "각 목차 제목을 level='sec' 블록으로 배치합니다(보통 3~6개, 내용에 따라 가감). "
+            "3) 먼저 사용자가 준 내용과 참고 자료 전체를 분석해 이 보고에 맞는 목차를 직접 설계하고, "
+            "각 목차 제목을 level='sec' 블록으로 배치합니다. 목차 수를 아끼지 마세요 — 내용을 "
+            "빠짐없이 담는 데 필요한 만큼 세분화합니다(내용이 많으면 8개 이상도 좋습니다). "
+            "배경·경위·현황·문제점·검토의견·기대효과·향후계획·협조사항 등에서 내용에 맞는 축을 조합합니다. "
             "sec의 text에는 번호를 붙이지 않습니다 — 번호(1., 2., ...)는 시스템이 순서대로 자동 부여합니다.\n"
             "   각 sec 아래에 level='item'(○ 핵심 사실·내용)과 level='sub'(― 부연·수치·근거)로 "
             "내용을 구체화합니다. 한 목차 안에서 내용을 더 묶어야 할 때만 level='head'(□)를 "
             "sec와 item 사이에 사용합니다.\n"
-            "   블록 수 제한은 없습니다. 사용자가 준 의견·사실·수치·일정을 빠뜨리지 말고 모두 "
-            "반영하고, 짧게 요약해 버리지 말고 충분히 길고 구체적으로 작성합니다.\n"
+            "   블록 수 제한은 없고 문서가 여러 장이 되어도 좋습니다. 사용자가 준 의견·사실·수치·일정과 "
+            "참고 자료의 세부 내용을 빠뜨리지 말고 모두 반영하고, 짧게 요약해 버리지 말고 "
+            "충분히 길고 구체적으로 작성합니다.\n"
         )
     elif feats.get("head"):
         rule_levels = (
