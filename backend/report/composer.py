@@ -106,9 +106,6 @@ def _compose_system(tpl: dict) -> str:
             "   주의: 목차(sec)마다 sections 배열을 나누지 않습니다. sec를 포함한 모든 블록을 "
             "같은 섹션 배열 안에 순서대로 넣습니다.\n"
         )
-    if not feats.get("overview", True):
-        rule_levels += ("   이 서식에는 개요란이 없습니다. overview는 빈 문자열로 두고, "
-                        "전체 요지는 본문 첫 목차에 담습니다.\n")
     elif feats.get("head"):
         rule_levels = (
             "3) 항목은 3단계입니다. level='head'는 대항목(□), level='item'은 중간 항목(○), "
@@ -122,6 +119,17 @@ def _compose_system(tpl: dict) -> str:
             "level='sub'은 하위 세부(―)입니다. sub는 바로 위 item을 보충합니다. "
             "level='sec'과 level='head'는 사용하지 않습니다.\n"
         )
+    if not feats.get("overview", True):
+        rule_levels += ("   이 서식에는 개요란이 없습니다. overview는 빈 문자열로 두고, "
+                        "전체 요지는 본문 첫 목차에 담습니다.\n")
+    if feats.get("sec"):
+        rule_label = (
+            "4) 항목 앞에 '(현황)', '(방향)' 같은 괄호 구분 라벨을 붙이지 않습니다. "
+            "소제목으로 묶을 필요가 있을 때만 level='head'(□)를 사용하고, "
+            "항목(○)은 라벨 없이 내용부터 바로 씁니다.\n"
+        )
+    else:
+        rule_label = "4) 핵심 항목은 '(구분) 내용' 형태로 시작하면 좋습니다. 예: '(소요예산) ...'.\n"
     if feats.get("table", True):
         rule_table = (
             "5) table: 사용자가 표를 요청하면 4열(단계/주요 내용/추진 시기/담당 등) 표를 생성하고, "
@@ -137,13 +145,13 @@ def _compose_system(tpl: dict) -> str:
         "1) 문체는 개조식 종결어미(~함, ~임, ~필요)를 사용합니다.\n"
         "2) sections 배열은 반드시 %d개이며 순서는 [%s] 목차에 대응합니다.\n"
         "%s"
-        "4) 핵심 항목은 '(구분) 내용' 형태로 시작하면 좋습니다. 예: '(소요예산) ...'.\n"
+        "%s"
         "%s"
         "6) 날짜는 '2026. 8.' 형식을 씁니다.\n"
         "7) 사용자가 제목을 제공하면 그 제목을 사용하되, 서식의 제목 규칙이 있으면 그에 맞게 다듬을 수 있습니다.\n"
         "8) 참고 자료가 제공되면 그 안의 사실관계·수치·명칭을 우선 활용합니다. "
         "참고 자료에 없는 구체적 수치를 지어내지 않습니다."
-    ) % (tpl["name"], len(labels), ", ".join(labels), rule_levels, rule_table)
+    ) % (tpl["name"], len(labels), ", ".join(labels), rule_levels, rule_label, rule_table)
     common = common_guide()
     if common:
         base += ("\n\n[공통 작성 지침 — 모든 보고서에 적용. 위 기본 규칙과 충돌하면 이 지침을 우선합니다]\n"
