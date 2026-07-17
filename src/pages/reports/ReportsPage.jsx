@@ -16,13 +16,17 @@ const emptyDoc = (tpl) => ({
   rows: [],
 })
 
-// AI 응답(doc)을 편집 상태로 변환. 섹션 블록 배열 → 줄 단위 텍스트(대항목 "□ ", 하위 "- " 접두)
+// AI 응답(doc)을 편집 상태로 변환. 섹션 블록 배열 → 줄 단위 텍스트
+// (목차 "1. "(순서대로 자동 번호), 대항목 "□ ", 하위 "- " 접두)
 const levelPrefix = { head: '□ ', sub: '- ' }
 const docToEdit = (doc, tpl) => ({
   title: doc.title || '',
   overview: doc.overview || '',
-  sections: tpl.sections.map((_, i) =>
-    (doc.sections?.[i] || []).map((b) => (levelPrefix[b.level] || '') + b.text).join('\n')),
+  sections: tpl.sections.map((_, i) => {
+    let secNo = 0
+    return (doc.sections?.[i] || []).map((b) =>
+      (b.level === 'sec' ? `${++secNo}. ` : levelPrefix[b.level] || '') + b.text).join('\n')
+  }),
   includeTable: Boolean(doc.table),
   tableCaption: doc.table?.caption || '',
   tableSection: doc.table?.section || tpl.sections.length,
@@ -31,9 +35,11 @@ const docToEdit = (doc, tpl) => ({
 })
 
 // 편집 상태의 섹션 텍스트를 미리보기용 블록으로 파싱
-const parseBlocks = (text) => (text || '').split('\n')
+const parseBlocks = (text, feats) => (text || '').split('\n')
   .map((line) => line.trim()).filter(Boolean)
   .map((line) => {
+    const sec = feats?.sec && line.match(/^\d{1,2}[.)]\s+(.*)/)
+    if (sec) return { level: 'sec', text: sec[1] }
     if (line.startsWith('□')) return { level: 'head', text: line.replace(/^□\s*/, '') }
     if (line.startsWith('-') || line.startsWith('―')) return { level: 'sub', text: line.replace(/^[-―]\s*/, '') }
     return { level: 'item', text: line.replace(/^○\s*/, '') }
@@ -232,9 +238,11 @@ export default function ReportsPage() {
                 <textarea rows={3} value={doc.overview} onChange={(e) => setDoc({ ...doc, overview: e.target.value })} />
               </>
             )}
-            <p className="rp-hint">{feats.head
-              ? '한 줄 = 한 항목 · 줄 앞 “□”는 대항목, “-”는 세부(―), 없으면 항목(○)'
-              : '한 줄 = 한 항목(○) · 줄 앞에 “-”를 붙이면 하위 항목(―)'}</p>
+            <p className="rp-hint">{feats.sec
+              ? '한 줄 = 한 항목 · 줄 앞 “1.” 숫자는 목차(번호 자동), “□”는 대항목, “-”는 세부, 없으면 항목(○)'
+              : feats.head
+                ? '한 줄 = 한 항목 · 줄 앞 “□”는 대항목, “-”는 세부(―), 없으면 항목(○)'
+                : '한 줄 = 한 항목(○) · 줄 앞에 “-”를 붙이면 하위 항목(―)'}</p>
             {tpl?.sections.map((label, i) => (
               <div key={label + i} className="rp-section">
                 <div className="rp-section-label"><span className="rp-num">{i + 1}</span>{label}</div>
@@ -288,18 +296,18 @@ export default function ReportsPage() {
             <h1 className="rp-doc-title">{doc.title || '문서 제목'}</h1>
             {doc.overview.trim() && <div className="rp-doc-overview">{doc.overview}</div>}
             {tpl?.sections.map((label, i) => {
-              const blocks = parseBlocks(doc.sections[i])
+              const blocks = parseBlocks(doc.sections[i], feats)
+              let secNo = 0
               return (
                 <div key={label + i}>
-                  <div className="rp-doc-bar"><span>{i + 1}</span>{label}</div>
+                  {tpl.sections.length > 1 && <div className="rp-doc-bar"><span>{i + 1}</span>{label}</div>}
                   {blocks.length === 0 && <p className="rp-doc-empty">（내용 없음）</p>}
-                  {blocks.map((b, j) => (
-                    b.level === 'head'
-                      ? <p key={j} className="rp-doc-head">□ {b.text}</p>
-                      : b.level === 'sub'
-                        ? <p key={j} className="rp-doc-sub">- {b.text}</p>
-                        : <p key={j} className="rp-doc-item">○ {b.text}</p>
-                  ))}
+                  {blocks.map((b, j) => {
+                    if (b.level === 'sec') { secNo += 1; return <p key={j} className="rp-doc-sec">{secNo}. {b.text}</p> }
+                    if (b.level === 'head') return <p key={j} className="rp-doc-head">□ {b.text}</p>
+                    if (b.level === 'sub') return <p key={j} className="rp-doc-sub">- {b.text}</p>
+                    return <p key={j} className="rp-doc-item">○ {b.text}</p>
+                  })}
                   {doc.includeTable && doc.tableSection === i + 1 && previewTable}
                 </div>
               )

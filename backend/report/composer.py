@@ -41,7 +41,7 @@ COMPOSE_SCHEMA = {
                 "items": {
                     "type": "object",
                     "properties": {
-                        "level": {"type": "string", "enum": ["head", "item", "sub"]},
+                        "level": {"type": "string", "enum": ["sec", "head", "item", "sub"]},
                         "text": {"type": "string"},
                     },
                     "required": ["level", "text"],
@@ -90,17 +90,29 @@ def _compose_system(tpl: dict) -> str:
     labels = tpl["sections"]
     feats = tpl.get("features", {})
     numbered = ", ".join("%d=%s" % (i + 1, lab) for i, lab in enumerate(labels))
-    if feats.get("head"):
+    if feats.get("sec"):
+        rule_levels = (
+            "3) 먼저 사용자가 준 내용 전체를 분석해 이 보고에 맞는 핵심 목차를 직접 도출하고, "
+            "각 목차 제목을 level='sec' 블록으로 배치합니다(보통 3~6개, 내용에 따라 가감). "
+            "sec의 text에는 번호를 붙이지 않습니다 — 번호(1., 2., ...)는 시스템이 순서대로 자동 부여합니다.\n"
+            "   각 sec 아래에 level='item'(○ 핵심 사실·내용)과 level='sub'(― 부연·수치·근거)로 "
+            "내용을 구체화합니다. 한 목차 안에서 내용을 더 묶어야 할 때만 level='head'(□)를 "
+            "sec와 item 사이에 사용합니다.\n"
+            "   블록 수 제한은 없습니다. 사용자가 준 의견·사실·수치·일정을 빠뜨리지 말고 모두 "
+            "반영하고, 짧게 요약해 버리지 말고 충분히 길고 구체적으로 작성합니다.\n"
+        )
+    elif feats.get("head"):
         rule_levels = (
             "3) 항목은 3단계입니다. level='head'는 대항목(□), level='item'은 중간 항목(○), "
             "level='sub'은 세부(―)입니다. head 아래에 관련 item을, item 아래에 보충 sub를 "
-            "배치합니다. 블록 수는 정해진 제한 없이 내용 분량에 맞게 정합니다.\n"
+            "배치합니다. 블록 수는 정해진 제한 없이 내용 분량에 맞게 정합니다. "
+            "level='sec'은 사용하지 않습니다.\n"
         )
     else:
         rule_levels = (
             "3) 각 섹션은 2~4개의 블록으로 구성합니다. level='item'은 상위 항목(○), "
             "level='sub'은 하위 세부(―)입니다. sub는 바로 위 item을 보충합니다. "
-            "level='head'는 사용하지 않습니다.\n"
+            "level='sec'과 level='head'는 사용하지 않습니다.\n"
         )
     if feats.get("table", True):
         rule_table = (
@@ -162,7 +174,7 @@ def _compose_llm(req: dict, tpl: dict) -> dict:
         raise RuntimeError("API 키 없음 — backend/.env 에 ANTHROPIC_API_KEY=... 를 넣으세요")
     body = {
         "model": MODEL,
-        "max_tokens": 8000,
+        "max_tokens": 16000,  # 목차형 개인보고서 등 긴 문서 생성 여유분
         "system": _compose_system(tpl),
         "messages": [{"role": "user", "content": _compose_user(req, tpl)}],
         "output_config": {"format": {"type": "json_schema", "schema": COMPOSE_SCHEMA}},
@@ -192,12 +204,17 @@ def _compose_llm(req: dict, tpl: dict) -> dict:
     n = len(tpl["sections"])
     secs = doc.get("sections") or []
     doc["sections"] = (secs + [[] for _ in range(n)])[:n]
-    if not tpl.get("features", {}).get("head"):
-        # □ 단계가 없는 서식에서 head가 나오면 상위 항목(○)으로 강등
+    # 서식이 지원하지 않는 레벨이 나오면 지원 레벨로 강등
+    feats = tpl.get("features", {})
+    demote = {}
+    if not feats.get("sec"):
+        demote["sec"] = "head" if feats.get("head") else "item"
+    if not feats.get("head"):
+        demote["head"] = "item"
+    if demote:
         for sec in doc["sections"]:
             for b in sec:
-                if b.get("level") == "head":
-                    b["level"] = "item"
+                b["level"] = demote.get(b.get("level"), b.get("level"))
     if not req["include_table"]:
         doc["table"] = None
     return doc

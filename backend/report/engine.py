@@ -31,7 +31,8 @@ TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
 COMMON_GUIDE_PATH = TEMPLATES_DIR / "_공통지침.md"
 
 # 필수 마커 — 없으면 서식 등록 거부. 그 외는 선택(있으면 features로 노출):
-#   {{OVERVIEW}}(개요 상자) · □ {{HEAD}}(대항목 단계) · 표 3종({{TBL_CAPTION}}/{{TH}}/{{TD}})
+#   {{OVERVIEW}}(개요 상자) · 1. {{SEC}}(AI가 도출하는 번호 목차, 자동 번호 부여)
+#   · □ {{HEAD}}(대항목 단계) · 표 3종({{TBL_CAPTION}}/{{TH}}/{{TD}})
 REQUIRED_MARKERS = ["{{TITLE}}", "○ {{ITEM}}", "- {{SUB}}"]
 TABLE_MARKERS = ["{{TBL_CAPTION}}", "{{TH}}", "{{TD}}"]
 
@@ -68,7 +69,8 @@ def analyze_template(path: Path) -> dict:
         raise ValueError("표 마커 불완전(셋 다 있거나 셋 다 없어야 함): %s" % ", ".join(tbl_found))
     features = {"overview": "{{OVERVIEW}}" in xml,
                 "table": bool(tbl_found),
-                "head": "□ {{HEAD}}" in xml}
+                "head": "□ {{HEAD}}" in xml,
+                "sec": "1. {{SEC}}" in xml}
 
     labels = []
     for m in re.finditer(r'<hp:tbl[^>]*rowCnt="1" colCnt="2".*?</hp:tbl>', xml, flags=re.S):
@@ -87,6 +89,8 @@ def analyze_template(path: Path) -> dict:
         labels = ["본문"]
     if features["head"] and xml.count("□ {{HEAD}}") != n_item:
         raise ValueError("HEAD 견본 %d개 ≠ ITEM 견본 %d개" % (xml.count("□ {{HEAD}}"), n_item))
+    if features["sec"] and xml.count("1. {{SEC}}") != n_item:
+        raise ValueError("SEC 견본 %d개 ≠ ITEM 견본 %d개" % (xml.count("1. {{SEC}}"), n_item))
 
     guide = gp.read_text(encoding="utf-8-sig").strip() if gp else ""
 
@@ -242,7 +246,11 @@ def form_to_doc(data: dict, tpl: dict) -> dict:
             t = line.strip()
             if not t:
                 continue
-            if t[0] == "□":
+            m = re.match(r"\d{1,2}[.)]\s+(.+)", t)
+            if m and feats.get("sec"):
+                # 번호 목차 줄 — 번호는 버리고 조립 때 순서대로 다시 매긴다
+                blocks.append(("sec", m.group(1).strip()))
+            elif t[0] == "□":
                 # 서식에 □ 단계가 없으면 상위 항목(○)으로 강등
                 kind = "head" if feats.get("head") else "item"
                 blocks.append((kind, t.lstrip("□ ").strip()))
@@ -285,9 +293,11 @@ def build_hwpx(doc: dict, tpl: dict) -> bytes:
     # 항목 견본 추출
     s, e = _para_span(xml, xml.index("○ {{ITEM}}")); item_tpl = xml[s:e]
     s, e = _para_span(xml, xml.index("- {{SUB}}")); sub_tpl = xml[s:e]
-    head_tpl = ""
+    head_tpl = sec_tpl = ""
     if feats.get("head"):
         s, e = _para_span(xml, xml.index("□ {{HEAD}}")); head_tpl = xml[s:e]
+    if feats.get("sec"):
+        s, e = _para_span(xml, xml.index("1. {{SEC}}")); sec_tpl = xml[s:e]
 
     # 표를 템플릿 고정 위치에서 잘라내 이동식 부품으로 확보 (표 지원 서식만)
     cap_tpl = tbl_tpl = ""
@@ -304,9 +314,12 @@ def build_hwpx(doc: dict, tpl: dict) -> bytes:
 
     # 섹션별 항목 복제 + 어울리는 섹션 끝에 표 삽입
     for no, blocks in enumerate(doc["sections"], 1):
-        frags = []
+        frags, sec_no = [], 0
         for kind, text in blocks:
-            if kind == "head" and head_tpl:
+            if kind == "sec" and sec_tpl:
+                sec_no += 1  # 목차 번호는 순서대로 자동 부여
+                frags.append(sec_tpl.replace("1. {{SEC}}", "%d. %s" % (sec_no, escape(text))))
+            elif kind == "head" and head_tpl:
                 frags.append(head_tpl.replace("□ {{HEAD}}", "□ " + escape(text)))
             elif kind == "sub":
                 frags.append(sub_tpl.replace("- {{SUB}}", "- " + escape(text)))
@@ -314,12 +327,10 @@ def build_hwpx(doc: dict, tpl: dict) -> bytes:
                 frags.append(item_tpl.replace("○ {{ITEM}}", "○ " + escape(text)))
         if no == tbl_at:
             frags.append(tbl_frag)
-        # 견본 문단 묶음(□?·○·-)을 통째로 실제 내용으로 교체
-        if head_tpl:
-            start, he = _para_span(xml, xml.index("□ {{HEAD}}"))
-            is_, ie = _para_span(xml, xml.index("○ {{ITEM}}", he))
-        else:
-            start, ie = _para_span(xml, xml.index("○ {{ITEM}}"))
+        # 견본 문단 묶음(목차?·□?·○·-)을 통째로 실제 내용으로 교체
+        first = "1. {{SEC}}" if sec_tpl else ("□ {{HEAD}}" if head_tpl else "○ {{ITEM}}")
+        start, _pos = _para_span(xml, xml.index(first))
+        _s, ie = _para_span(xml, xml.index("○ {{ITEM}}", start))
         ss, se = _para_span(xml, xml.index("- {{SUB}}", ie))
         xml = xml[:start] + "".join(frags) + xml[se:]
 
@@ -330,8 +341,8 @@ def build_hwpx(doc: dict, tpl: dict) -> bytes:
     xml = _strip_body_linesegs(xml)
 
     # 생성 후 검증: 잔여 마커·XML 문법
-    leftover = [m for m in ("{{TITLE}}", "{{OVERVIEW}}", "{{HEAD}}", "{{ITEM}}", "{{SUB}}",
-                            "{{TBL_CAPTION}}", "{{TH}}", "{{TD}}") if m in xml]
+    leftover = [m for m in ("{{TITLE}}", "{{OVERVIEW}}", "{{SEC}}", "{{HEAD}}", "{{ITEM}}",
+                            "{{SUB}}", "{{TBL_CAPTION}}", "{{TH}}", "{{TD}}") if m in xml]
     if leftover:
         raise ValueError("잔여 마커: %s" % leftover)
     ET.fromstring(xml.encode("utf-8"))

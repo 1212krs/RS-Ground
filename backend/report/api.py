@@ -61,7 +61,7 @@ async def compose_report(
     if not title:
         raise HTTPException(400, "제목을 입력하세요.")
     require_max_len(title, "title", 150)
-    require_max_len(brief, "brief", 6000)
+    require_max_len(brief, "brief", 12000)  # 개인보고서 등 '통째로 던지는' 긴 메모 허용
     require_max_len(template, "template", 80)
     tpl = get_template(template)
 

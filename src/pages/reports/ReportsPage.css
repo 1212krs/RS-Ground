@@ -65,6 +65,8 @@
 .rp-doc-bar { background: #e9ebf5; border-left: 5px solid #3d4eae; padding: 6px 12px; font-weight: 700;
   font-size: 14.5px; margin: 16px 0 8px; display: flex; align-items: center; gap: 9px; }
 .rp-doc-bar span { color: #3d4eae; }
+.rp-doc-sec { font-size: 15px; font-weight: 800; line-height: 1.75; margin: 16px 0 5px; }
+.rp-doc-sec ~ .rp-doc-head { margin-left: 8px; }
 .rp-doc-head { font-size: 14px; font-weight: 700; line-height: 1.75; margin: 10px 0 3px; }
 .rp-doc-head ~ .rp-doc-item { margin-left: 14px; }
 .rp-doc-head ~ .rp-doc-sub { margin-left: 34px; }
