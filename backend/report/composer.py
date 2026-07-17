@@ -103,7 +103,12 @@ def _compose_system(tpl: dict) -> str:
             "   블록 수 제한은 없고 문서가 여러 장이 되어도 좋습니다. 사용자가 준 의견·사실·수치·일정과 "
             "참고 자료의 세부 내용을 빠뜨리지 말고 모두 반영하고, 짧게 요약해 버리지 말고 "
             "충분히 길고 구체적으로 작성합니다.\n"
+            "   주의: 목차(sec)마다 sections 배열을 나누지 않습니다. sec를 포함한 모든 블록을 "
+            "같은 섹션 배열 안에 순서대로 넣습니다.\n"
         )
+    if not feats.get("overview", True):
+        rule_levels += ("   이 서식에는 개요란이 없습니다. overview는 빈 문자열로 두고, "
+                        "전체 요지는 본문 첫 목차에 담습니다.\n")
     elif feats.get("head"):
         rule_levels = (
             "3) 항목은 3단계입니다. level='head'는 대항목(□), level='item'은 중간 항목(○), "
@@ -203,9 +208,13 @@ def _compose_llm(req: dict, tpl: dict) -> dict:
 
     text = next(b["text"] for b in resp["content"] if b["type"] == "text")
     doc = json.loads(text)
-    # 안전장치: 섹션 수를 템플릿에 맞춰 정규화
+    # 안전장치: 섹션 수를 템플릿에 맞춰 정규화.
+    # AI가 목차(sec)별로 배열을 쪼개 더 많이 반환하면 잘라 버리지 말고 마지막 섹션에 이어 붙인다
+    # (예전엔 [:n]으로 잘라서 첫 목차만 남는 내용 유실이 있었음).
     n = len(tpl["sections"])
     secs = doc.get("sections") or []
+    if len(secs) > n:
+        secs = secs[:n - 1] + [sum(secs[n - 1:], [])]
     doc["sections"] = (secs + [[] for _ in range(n)])[:n]
     # 서식이 지원하지 않는 레벨이 나오면 지원 레벨로 강등
     feats = tpl.get("features", {})
@@ -218,6 +227,8 @@ def _compose_llm(req: dict, tpl: dict) -> dict:
         for sec in doc["sections"]:
             for b in sec:
                 b["level"] = demote.get(b.get("level"), b.get("level"))
+    if not feats.get("overview", True):
+        doc["overview"] = ""  # 개요란 없는 서식 — hwpx에 안 들어가므로 미리보기에도 남기지 않는다
     if not req["include_table"]:
         doc["table"] = None
     return doc

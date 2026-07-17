@@ -21,7 +21,8 @@ const emptyDoc = (tpl) => ({
 const levelPrefix = { head: '□ ', sub: '- ' }
 const docToEdit = (doc, tpl) => ({
   title: doc.title || '',
-  overview: doc.overview || '',
+  // 개요란 없는 서식은 AI가 개요를 보내와도 버린다 (hwpx에 안 들어가는데 미리보기에만 보이는 혼란 방지)
+  overview: (tpl.features?.overview ?? true) ? (doc.overview || '') : '',
   sections: tpl.sections.map((_, i) => {
     let secNo = 0
     return (doc.sections?.[i] || []).map((b) =>
