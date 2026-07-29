@@ -732,3 +732,26 @@ UMAP 단계에서 `TypeError: check_array() got an unexpected keyword argument '
 - **비용(실측):** OCR 348쪽 × $0.01 = **$3.48** + 임베딩 약 $0.02 (일회성). 기존 회계 조각들은 임베딩 캐시 덕분에 재과금 0원.
 - **결과:** 예산 710조각 색인 (전체 1,807조각 = 회계 1,046 + 예산 710 + 프로젝트 문서 51).
 - **격리 검증:** "예산의 이용과 전용의 차이는?"으로 실제 검색 — 예산 스코프는 예산 교재에서만, 회계 스코프는 회계 교재에서만 근거가 나오는 것을 확인. 원본 스캔 PDF는 `_excluded_docs/`에 보관.
+
+---
+
+### 2026-07-29 — 백엔드 배포처 Render → Railway 전환 (설정 준비)
+
+**무엇이 문제였나:** 회사 네트워크에서 Render 대시보드 로그인 화면 자체가 접속되지 않는 문제가 있었습니다(회사망의 차단 추정). 백엔드 서버를 관리하려면 Render 대시보드에 들어가야 하는데 그게 안 되니, 회사에서는 서버 상태를 확인하거나 계정을 추가하는 등의 작업을 할 수 없었습니다. 그래서 같은 역할(파이썬 서버 + 영구 저장공간)을 하는 다른 서비스인 **Railway**로 옮기기로 했습니다.
+
+**개념 먼저 설명하면 — "배포 설정 파일"이 왜 필요한가:**
+- Render는 저장소 안의 `render.yaml` 파일을 읽어서 "이 명령으로 설치하고, 이 명령으로 실행하고, 이만큼 저장공간을 줘라"를 자동으로 알아냅니다.
+- Railway도 비슷하게 동작하지만 파일 이름과 형식이 다릅니다(`railway.json`). 그래서 Render 전용 설정을 그대로 쓸 수 없고, Railway가 읽을 수 있는 형태로 새로 만들어야 합니다.
+- 파이썬 버전을 고정하는 방법도 다릅니다. Render는 환경변수(`PYTHON_VERSION`)로 지정했지만, Railway가 쓰는 빌드 도구(Nixpacks)는 `.python-version`이라는 파일을 보고 버전을 맞춥니다.
+
+**무엇을 만들었나 (에이전트가 이번에 한 일 — 코드/문서만):**
+- `backend/railway.json` 신규 — 빌드 명령(`pip install -r requirements.txt`)과 실행 명령(`uvicorn main:app ...`)을 Railway가 읽도록 지정.
+- `backend/.python-version` 신규 — `3.11.9`로 고정(개발 환경과 동일한 버전으로 배포되게).
+- `docs/DEPLOY.md`의 백엔드 배포 절차(3~8절)를 Render 기준에서 Railway 기준으로 다시 씀 — Root Directory를 `backend`로 지정하는 법, "영구 디스크" 대신 "Volume" 만드는 법, Render의 웹 Shell 대신 Railway CLI(`railway run ...`)로 재색인·계정 생성하는 법 등.
+- `CLAUDE.md`의 배포처 설명 한 줄, `AGENT.md`의 최종 업데이트 정보도 함께 갱신.
+- 기존 `render.yaml`은 사용자 요청에 따라 **지우지 않고 그대로 보관**(당장 쓰지 않지만 참고용으로 남겨둠).
+
+**아직 안 된 것 (여기서부터는 대시보드에서 직접 해야 함 — 에이전트가 대신 할 수 없는 부분):**
+- Railway 계정 생성, GitHub 저장소 연결, Root Directory 지정, 환경변수(API 키 2개 + `RSG_DATA_DIR`·`FRONTEND_ORIGINS`·`RSG_ALLOWED_HOSTS`) 입력, Volume(영구 저장공간) 만들기, 배포 후 나온 새 주소로 Vercel의 `VITE_API_BASE`를 바꿔서 재배포하기.
+- Railway는 처음엔 벡터DB(문서 검색용 데이터베이스)와 계정 정보가 비어 있는 새 서버입니다. Render에 있던 데이터가 자동으로 옮겨지지 않으므로, `docs/DEPLOY.md` 3-6·3-7절대로 재색인(`rag.pipeline index`)과 계정 재생성(`auth.manage add`)을 다시 해야 합니다.
+- 자세한 순서는 `docs/DEPLOY.md` 3절에 단계별로 정리해뒀습니다.

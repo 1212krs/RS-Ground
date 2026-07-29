@@ -14,7 +14,7 @@ RS-Ground (`rs-ground`, v0.1.0) is a personal work platform frontend+backend: do
 
 - Frontend: Vite + React (JS/JSX, no TypeScript), `react-router-dom`, plain CSS (one `.css` file per component/page — no Tailwind).
 - Backend: Python FastAPI (`backend/`), SQLite for auth/store/meeting data, ChromaDB for RAG vector storage.
-- Deployed: frontend on Vercel, backend on Render (with persistent disk).
+- Deployed: frontend on Vercel, backend on Railway (with a persistent volume).
 
 ## Commands
 
