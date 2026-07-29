@@ -755,3 +755,29 @@ UMAP 단계에서 `TypeError: check_array() got an unexpected keyword argument '
 - Railway 계정 생성, GitHub 저장소 연결, Root Directory 지정, 환경변수(API 키 2개 + `RSG_DATA_DIR`·`FRONTEND_ORIGINS`·`RSG_ALLOWED_HOSTS`) 입력, Volume(영구 저장공간) 만들기, 배포 후 나온 새 주소로 Vercel의 `VITE_API_BASE`를 바꿔서 재배포하기.
 - Railway는 처음엔 벡터DB(문서 검색용 데이터베이스)와 계정 정보가 비어 있는 새 서버입니다. Render에 있던 데이터가 자동으로 옮겨지지 않으므로, `docs/DEPLOY.md` 3-6·3-7절대로 재색인(`rag.pipeline index`)과 계정 재생성(`auth.manage add`)을 다시 해야 합니다.
 - 자세한 순서는 `docs/DEPLOY.md` 3절에 단계별로 정리해뒀습니다.
+
+---
+
+### 2026-07-29 (이어서) — Railway 이전 완료
+
+**결과부터:** 새 백엔드 주소는 `https://rs-ground-production.up.railway.app`. `rs-ground.vercel.app`에서 로그인·문서 검색까지 실제로 확인했습니다.
+
+**대시보드 작업(사용자가 직접 진행):** Railway 프로젝트 생성 → GitHub 저장소 연결 → Root Directory를 `backend`로 지정 → Volume(영구 저장공간)을 `/data`에 연결 → 환경변수(API 키 2개, `RSG_DATA_DIR`) 입력 → 공개 도메인 생성 → `RSG_ALLOWED_HOSTS`·`FRONTEND_ORIGINS` 설정 → Vercel의 `VITE_API_BASE`를 새 주소로 바꿔 재배포.
+
+**개념 설명 — "재배포 서버 안에서 명령을 실행한다"는 게 뭔가:**
+- 로컬 PC에서 서버 관리 명령(문서 재색인, 계정 생성)을 실행하려면 실제 서버 컴퓨터 안으로 "들어가야" 합니다. Render는 브라우저 안에 "Shell"이라는 터미널 화면을 제공했지만, Railway는 그 대신 **Railway CLI**(내 PC 터미널에 설치하는 프로그램)로 `railway ssh` 명령을 쓰면 실제 서버 컴퓨터 안에 접속해 명령을 실행할 수 있습니다. SSH는 "다른 컴퓨터에 안전하게 원격 접속하는 방법"을 뜻하는 표준 기술입니다.
+- 처음엔 `railway run <명령>`을 썼는데, 이건 **서버 안이 아니라 내 PC에서** Railway의 환경변수만 빌려와 실행하는 다른 명령이었습니다(이름이 비슷해서 헷갈리기 쉬움). 그래서 서버 전용 저장 경로(`/data`, 리눅스 경로)를 내 Windows PC가 이해 못 해 오류가 났고, `railway ssh`로 바꿔서 해결했습니다.
+
+**에이전트가 대신 실행한 작업 (CLI):**
+1. Railway CLI 설치(`npm install -g @railway/cli`), 로그인(`railway login`, 브라우저 인증), 이 프로젝트와 연결(`railway link`).
+2. SSH 접속에 필요한 "열쇠"(SSH 키)가 PC에 없어서 새로 생성 후 Railway에 등록(`ssh-keygen`, `railway ssh keys add`).
+3. **문서 재색인.** 실행해보니 검색할 원본 문서 폴더(`data/raw`)가 서버 안에 없다는 걸 발견했습니다. 원인: Render는 저장소 전체를 서버에 복사한 뒤 `backend` 폴더에서 실행하는 방식이라 옆에 있는 `data/raw`도 같이 딸려갔는데, Railway는 **Root Directory로 지정한 `backend` 폴더만** 서버에 넣고 나머지는 아예 가져오지 않는 방식이었습니다(두 서비스의 설계 차이). 다행히 서버 저장 코드가 우연히 우리가 만든 영구 저장공간(`/data`) 경로를 보게 되어 있어서, 로컬의 `data/raw`(1.7MB, 문서 5개)를 압축해서 그 경로로 직접 전송(`tar` + `railway ssh` 파이프)한 뒤 재색인을 실행해 성공했습니다. 결과: 1,807개 조각(회계 1,046+예산 710+프로젝트 문서 51) — Render 시절과 정확히 같은 규모로 확인.
+4. **로그인 계정 생성**(`rsakim`). 처음엔 확인용 테스트 명령에서 필드 이름을 잘못 써서(`username`이 아니라 실제로는 `loginId`) 로그인이 실패하는 것처럼 보였는데, 알고 보니 계정 자체엔 문제가 없었고 제가 확인 도구를 잘못 썼던 것이었습니다. 확인 과정에서 비밀번호를 한 번 더 안전한 방식(문자를 깨지지 않게 인코딩해서 전달)으로 재설정했고, 최종적으로 curl(터미널에서 웹 요청을 보내는 도구)로 직접 로그인해 정상 작동을 확인했습니다.
+5. `FRONTEND_ORIGINS`(CORS 허용 명단)에 실제 Vercel 주소(`rs-ground.vercel.app`) 등록.
+
+**검증:** curl로 직접 로그인(200 응답, 토큰 발급 확인)·문서 목록 조회(5개 문서, 1,807조각 정상), 실제 웹사이트에서 `rsakim` 계정으로 로그인 성공까지 확인.
+
+**아직 안 된 것 / 참고:**
+- 예전 Render 서비스가 켜져 있으면 이중 과금될 수 있습니다 — Render 대시보드 접속이 가능해지면 정지/삭제 필요.
+- Railway 무료 체험 크레딧(가입 시 "30 days or $5.00 left")이 소진되면 결제수단 등록이 필요합니다.
+- AI 채팅(Claude가 실제로 답변을 만드는 부분)의 완전한 동작은 이번엔 확인하지 않았습니다(문서 목록 조회까지만 확인). 화면에서 직접 질문해보며 확인 필요.

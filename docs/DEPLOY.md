@@ -148,8 +148,14 @@
 
 - **배포 완료(2026-07-10):** 백엔드(원래 Render) + 프론트(Vercel, `https://rs-ground.vercel.app`)
   연결·로그인·재색인까지 동작. 이후 `git push`가 곧 자동배포.
-- **백엔드를 Render → Railway로 이전(2026-07-29):** 회사망에서 Render 대시보드 로그인 자체가
-  안 되는 문제 때문. 절차는 위 3절 참고. `render.yaml`은 저장소에 보관만 하고 더 이상 쓰지 않는다.
+- **백엔드를 Render → Railway로 이전 완료(2026-07-29):** 회사망에서 Render 대시보드 로그인 자체가
+  안 되는 문제 때문. 새 백엔드 주소: `https://rs-ground-production.up.railway.app`. 절차는 위 3절
+  참고. `render.yaml`은 저장소에 보관만 하고 더 이상 쓰지 않는다. **원본 문서(`data/raw`) 이전 주의:**
+  Render는 `rootDir` 지정 시에도 저장소 전체를 클론하지만, Railway는 Root Directory로 지정한
+  폴더(`backend`)만 컨테이너에 넣고 형제 폴더(`data/raw`)는 포함하지 않는다. 그래서 최초 이전 때
+  `tar czf - -C ../data raw | railway ssh -- "cd /data && tar xzf -"`로 로컬 `data/raw`를 Volume에
+  직접 올렸다(한 번만 하면 Volume에 남아 재배포해도 유지됨). 문서를 새로 추가할 때도 이 점 참고.
+  - Render 서비스는 이중 과금을 막기 위해 **별도로 정지/삭제** 필요(대시보드 접속 가능할 때 처리).
 - **임베딩 지도(UMAP) 기능은 제거됨** — 512MB급 인스턴스에서 UMAP 계산이 OOM을 내서 뺐다.
   지식 탭은 문서 목록만 보여준다. 채팅·검색·보고서·워크스페이스는 영향 없음.
 - **메모리 주의:** 512MB에서는 무거운 계산(대량 임베딩 등)이 OOM을 낼 수 있다. 재색인은 배치로
