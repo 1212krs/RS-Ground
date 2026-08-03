@@ -33,6 +33,8 @@ cd backend
 ./venv/Scripts/python.exe -m uvicorn main:app --reload --port 8000
 ```
 
+> `backend/venv`가 없는 환경도 있다(git에 포함되지 않음). 그때는 `./venv/Scripts/python.exe`를 `python`으로 바꿔 실행하거나 `python -m venv venv && ./venv/Scripts/pip install -r requirements.txt`로 다시 만든다. 아래의 다른 backend 명령들도 마찬가지다.
+
 `backend/main.py` is the combined entrypoint (auth + rag + report + meeting + store routers). Vite proxies `/api/*` to `127.0.0.1:8000` (see `vite.config.js`).
 
 Account management (no public signup — accounts are created via CLI):

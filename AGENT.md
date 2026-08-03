@@ -4,7 +4,7 @@
 사실만 기록하며, 아직 구현되지 않은 것은 "미구현/계획"으로 명시합니다.
 
 - **최초 작성**: 2026-07-05
-- **최종 업데이트**: 2026-07-29 (백엔드 배포처 Render → Railway 전환 완료)
+- **최종 업데이트**: 2026-08-03 (「2026년도 파주시 예산안 편성지침」 배치 + hwpx 표 추출 버그 수정 — 색인은 `UPSTAGE_API_KEY` 부재로 보류. 직전: 2026-07-29 백엔드 배포처 Render → Railway 전환 완료)
 - **대상 저장소**: `c:\Users\krs47\Documents\RS-Ground`
 
 > **이 프로젝트가 존재하는 이유**: `RSA Personal Agent`(`c:\Users\krs47\Documents\RSA Personal Agent`, remote `github.com/1212krs/RSA-Ground`)를 전면 재구축하기로 하면서, 실제 작업은 이 폴더(`RS-Ground`)에서 처음부터 새로 시작하기로 함(2026-07-05). `RSA Personal Agent`는 참고용으로 그대로 두고 더 이상 수정하지 않는다.
@@ -153,9 +153,11 @@ backend/
 - **스택**: 업스테이지 임베딩 API(이원 모델 — 문서는 `embedding-passage`, 질문은 `embedding-query`, 4096차원) + ChromaDB(로컬 영속, **컬렉션 생성 시 cosine 지정 필수 — 생성 후 변경 불가**). (UMAP/Plotly 시각화는 2026-07-10 제거.)
 - **형태**: `backend/rag/` 핵심 로직(청킹/임베딩/저장) + `backend/rag/api.py`(FastAPI, 지식 탭 연동용) + `backend/rag/pipeline.py`(CLI, 배치 색인·검색용). 둘 다 같은 핵심 함수를 재사용.
 - **React 연동(2026-07-07 완료)**: 지식 탭(`/knowledge`, `KnowledgePage.jsx`)에서 문서 업로드 → `ragApi.js` → Vite 프록시(`/api/rag` → `127.0.0.1:8000`) → `rag/api.py`가 파일 저장 후 `data/raw/` 전체를 재색인(청킹→임베딩→ChromaDB reset+upsert). 업로드 폼에 대/중/소분류 선택 입력 필드 있음(비우면 미분류). 목록 조회(`GET /api/rag/documents`)는 ChromaDB 메타데이터를 source별로 집계해서 반환. (재색인은 메모리 절약을 위해 배치 200개씩 임베딩→저장한다.)
-- **문서 형식 확장(2026-07-07)**: `backend/rag/extractors.py` 신규 — `.txt`/`.md`는 그대로 읽고, `.pdf`(pdfplumber)·`.docx`(python-docx)·`.hwpx`(zip+XML 직접 파싱, OWPML `hp:p`/`hp:t` 태그를 문단 단위로 재구성)에서 텍스트를 추출해 동일한 청킹 파이프라인에 태움. **HWPX는 외부 프로그램(한글) 의존 없이 순수 Python으로 파싱** — 서버에서 안정적으로 돌아가게 하려고 COM 자동화 대신 이 방식을 선택. 이 컴퓨터에 설치된 한글 프로그램으로 실제 HWPX/DOCX/PDF 샘플을 만들어 각각 추출 결과를 검증(문단 구분·한글 내용 정확히 보존 확인), CLI 파이프라인과 업로드 API 양쪽에서 실제 파일로 재검증 완료. **미지원**: XLSX, 옛 바이너리 `.hwp`(hwpx 아님), 스캔 이미지 PDF(OCR 없음).
+- **문서 형식 확장(2026-07-07)**: `backend/rag/extractors.py` 신규 — `.txt`/`.md`는 그대로 읽고, `.pdf`(pdfplumber)·`.docx`(python-docx)·`.hwpx`(zip+XML 직접 파싱, OWPML `hp:p`/`hp:t` 태그를 문단 단위로 재구성)에서 텍스트를 추출해 동일한 청킹 파이프라인에 태움. **HWPX는 외부 프로그램(한글) 의존 없이 순수 Python으로 파싱** — 서버에서 안정적으로 돌아가게 하려고 COM 자동화 대신 이 방식을 선택. 이 컴퓨터에 설치된 한글 프로그램으로 실제 HWPX/DOCX/PDF 샘플을 만들어 각각 추출 결과를 검증(문단 구분·한글 내용 정확히 보존 확인), CLI 파이프라인과 업로드 API 양쪽에서 실제 파일로 재검증 완료. **미지원**: XLSX, 옛 바이너리 `.hwp`(hwpx 아님, OLE 복합문서 — 매직바이트 `d0cf 11e0`로 식별. `report/extractors.py`에는 `hwp_text()` 구현이 있으나 rag 쪽은 미사용), DRM 걸린 hwpx(매직바이트 `SCDSA002`), 스캔 이미지 PDF(OCR 없음).
+- **hwpx 표 추출 수정(2026-08-03)**: hwpx의 표는 문단 안에 중첩된다(`p > run > tbl > tr > tc > subList > p > t`). 기존 구현은 모든 `p`의 하위 `hp:t`를 무구분 `"".join()` 해서 ① 표가 한 덩어리로 뭉개지고 ② 바깥 문단과 셀 문단에서 같은 텍스트를 **중복 추출**했다. `_walk_hwpx`(문서 순서 보존 재귀, 표를 만나면 하위로 안 내려감) + `_render_hwpx_table`(행=`\n`, 셀=`" | "` — docx 추출기와 동일 형식, 중첩 표 재귀 지원)로 교체. 행 사이를 빈 줄이 아닌 줄바꿈으로 둬서 chunker의 문단 분리(`\n\s*\n`)에 표가 쪼개지지 않는다. 실측(편성지침, 표 290개): 4,878블록/133,891자 → 1,041블록/84,626자, 중복 해소. `extract_text()` 시그니처는 불변이라 호출부 변경 없음.
 - **실행 환경**: `backend/venv`(Python 3.11.9, pyenv), 의존성은 `backend/requirements.txt`에 버전 고정. 실행: `cd backend && ./venv/Scripts/python.exe -m rag.pipeline index` (색인) / `... rag.pipeline search "질문"` (검색).
 - **코드 구조**: `config.py`(설정) · `chunker.py`(문단 우선 청킹 + 메타데이터, 폴더 계층을 `category_l1/l2/l3`로 자동 추출) · `embedder.py`(업스테이지 API + SQLite 캐시, `embed_passages`/`embed_query` 분리) · `store.py`(ChromaDB, cosine, `{source}::{chunk_index}` 결정적 ID + upsert, 분류 `where` 필터) · `pipeline.py`(CLI, 배치 색인 + `search --l1/--l2/--l3`로 분류 필터링).
+- **에이전트별 문서 배치**: 문서는 어느 폴더에 넣든 **AI챗(전체, 필터 없음)에는 항상 포함**된다. 특정 에이전트에 잡히게 하려면 그 에이전트의 `scope`와 같은 이름의 폴더에 넣으면 된다(예: 예산챗 → `data/raw/예산/`). "전체와 에이전트 양쪽에 각각 임베딩"하는 작업은 존재하지 않는다 — 창고는 하나이고 에이전트는 검색 필터일 뿐이다.
 - **문서 분류 원칙(2026-07-07 결정)**: 문서를 미리 손으로 분류하지 않는다 — 성격이 다른 문서는 임베딩 거리로 자동 분리됨. 대신 `data/raw/` 밑에 **폴더 계층으로만 자연스럽게 정리**(예: `기술/AI/AI챗봇/기획서.md`)하면 `chunker.py`가 상위 3단계를 자동으로 대/중/소분류 메타데이터로 뽑아 나중에 검색 필터링(`--l1/--l2/--l3`)에 쓸 수 있음. 상세: [docs/PRD-RAG.md](docs/PRD-RAG.md) 4.1절.
 - **초기 테스트 문서**: 실제 문서가 없어 프로젝트 자체 문서(AGENT.md/DEVLOG.md/PRD-RAG.md)를 `data/raw/`에 복사해 사용 — 나중에 실제 문서로 교체 가능.
 - **재색인 안전성**: `run_index()`는 매번 `reset_collection()`으로 ChromaDB 컬렉션을 통째로 비우고 다시 채운다 — 문서가 삭제·축소돼도 오래된 청크가 안 남게 하기 위함(source별 부분 삭제 대신 전체 리셋을 선택; 임베딩은 SQLite 캐시가 막아줘서 API 비용 증가 없음). `chunker.py`의 `_split_long_paragraph`는 문장 분할 후에도 남는 초과분을 고정 길이로 강제 분할하는 하드 스플릿 안전장치가 있어 마침표 없는 표/URL/코드블록도 chunk_size를 크게 벗어나지 않음(오버랩만큼의 소폭 초과는 의도된 허용치).
