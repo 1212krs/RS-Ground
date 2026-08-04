@@ -835,3 +835,25 @@ UMAP 단계에서 `TypeError: check_array() got an unexpected keyword argument '
 - 위 색인은 **로컬 PC의 `data/chroma`**일 뿐이고, 서버 벡터DB(1,807조각)와는 별개입니다.
 - Railway는 Root Directory가 `backend`라 저장소 루트의 `data/raw`가 배포에 포함되지 않고, `railway.json`에도 색인 명령이 없습니다. 즉 **커밋·푸시만으로는 서버에 반영되지 않습니다.**
 - 서버에 반영하려면 `docs/DEPLOY.md` 참고: hwpx를 Volume으로 전송(`tar czf - -C ../data raw | railway ssh -- "cd /data && tar xzf -"`) → `railway ssh -- python -m rag.pipeline index`. 서버는 캐시가 살아 있어 새 문서 192조각만 임베딩됩니다.
+
+---
+
+### 2026-08-04 — 지식 탭에 문서 삭제 기능 추가
+
+**왜 필요했나:** 편성지침을 지식 탭에서 올릴 때 **대분류를 비워두고** 올리면 파일이 `data/raw/` 바로 아래 저장됩니다. 그런데 분류는 입력값이 아니라 **폴더 위치에서 자동으로 도출**되므로(`chunker.py`의 `_category_from_path`), 이 경우 `category_l1`이 빈 문자열이 되어 **예산챗에서 검색되지 않습니다**(예산챗은 `category_l1='예산'`으로 거름). AI 채팅은 필터가 없어서 나오고요.
+
+**그런데 고칠 방법이 없었습니다:** 분류를 넣어 다시 올려도 **이전 파일이 지워지지 않습니다.** 업로드는 새 경로에 쓸 뿐이라 `data/raw/지침.hwpx`와 `data/raw/예산/지침.hwpx`가 **둘 다 남아** 192×2=384조각이 되고, 검색할 때 같은 내용이 두 번 근거로 올라옵니다. 그리고 라이브 서버의 API 목록을 조회해보니 `/api/rag/documents`에 **GET·POST만 있고 DELETE가 없었습니다**(회의록·할 일·학습노트에는 다 있는데 문서만 없었음). 즉 화면에서는 잘못 올린 문서를 지울 방법이 아예 없어서, `railway ssh`로 서버에 직접 들어가야만 했습니다.
+
+**개념 — 재색인은 왜 중복을 안 만드나:** 벡터DB 쪽은 걱정할 게 없습니다. `_reindex_all()`이 부를 때마다 `reset_collection()`으로 **컬렉션을 통째로 비우고 다시 채우기** 때문입니다. 문제가 되는 건 벡터DB가 아니라 **디스크에 남는 원본 파일**입니다.
+
+**한 일:**
+- `backend/rag/api.py` — `DELETE /api/rag/documents/{source:path}` 추가. 파일을 지우고 `_reindex_all()`로 전체 재색인합니다.
+  - 경로 검증은 `_resolve_source_path()`를 새로 만들었습니다. 업로드가 쓰는 `_safe_name()`은 슬래시를 잘라내 마지막 이름만 남기는데, 삭제는 `예산/지침.hwpx`처럼 **분류 폴더를 살려야** 해서 재사용할 수 없었습니다. 대신 `resolve()`로 `../`를 전부 펼친 뒤 `data/raw` 안인지 확인하고, 색인 대상 확장자인지도 검사합니다.
+  - 삭제 후 **빈 분류 폴더도 정리**합니다(목록에 빈 분류가 남지 않도록). `data/raw` 자체는 남깁니다.
+- `src/ragApi.js` — `deleteDocument(source)`. `encodeURIComponent`를 통째로 쓰면 슬래시가 `%2F`로 변해 `{source:path}` 라우트와 어긋나므로, **성분별로 인코딩하고 구분자 슬래시는 그대로** 둡니다.
+- `src/pages/knowledge/KnowledgePage.jsx` — 문서마다 휴지통 버튼, 삭제 전 확인창(되돌릴 수 없음을 명시), 삭제 중에는 업로드도 함께 잠금(`busy`).
+- `src/pages/knowledge/KnowledgePage.css` — `.kb-doc-del`(기존 `.kb` 팔레트의 `--red` 사용).
+
+**검증:** 임시 폴더에 격리해(실제 `data/raw`·`data/chroma`를 안 건드리도록) 업로드→삭제 전 과정을 돌려 **17개 항목 전부 통과**. 정상 삭제·빈 폴더 정리·목록 반영, 경로 조작 3종(`../../../etc/passwd`, 인코딩된 `..%2F`, 중간 `예산/../../`) 차단, 지원하지 않는 확장자(`.ini`) 거부(파일이 안 지워지는 것까지 확인), 없는 문서 404. 기존 `npm test` 11개 통과, `npm run build` 성공.
+
+**앞으로의 순서:** 배포 후 지식 탭에서 분류 없이 올라간 편성지침을 삭제 → 대분류 `예산`으로 다시 업로드(업로드가 재색인까지 자동) → 예산챗에서 "유류비 기준액이 얼마야?"로 확인(휘발유 1,672 / 실내등유 1,343 / 경유 1,537이 나와야 정상).

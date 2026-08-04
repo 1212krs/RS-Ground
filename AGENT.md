@@ -4,7 +4,7 @@
 사실만 기록하며, 아직 구현되지 않은 것은 "미구현/계획"으로 명시합니다.
 
 - **최초 작성**: 2026-07-05
-- **최종 업데이트**: 2026-08-03 (「2026년도 파주시 예산안 편성지침」 배치 + hwpx 표 추출 버그 수정 — 색인은 `UPSTAGE_API_KEY` 부재로 보류. 직전: 2026-07-29 백엔드 배포처 Render → Railway 전환 완료)
+- **최종 업데이트**: 2026-08-04 (지식 탭 문서 삭제 기능 추가. 직전: 2026-08-03 「파주시 예산안 편성지침」 배치 + hwpx 표 추출 버그 수정, 로컬 색인 1,999조각 완료)
 - **대상 저장소**: `c:\Users\krs47\Documents\RS-Ground`
 
 > **이 프로젝트가 존재하는 이유**: `RSA Personal Agent`(`c:\Users\krs47\Documents\RSA Personal Agent`, remote `github.com/1212krs/RSA-Ground`)를 전면 재구축하기로 하면서, 실제 작업은 이 폴더(`RS-Ground`)에서 처음부터 새로 시작하기로 함(2026-07-05). `RSA Personal Agent`는 참고용으로 그대로 두고 더 이상 수정하지 않는다.
@@ -63,7 +63,7 @@ src/
   main.jsx                        React 진입점. ErrorBoundary → BrowserRouter → AuthProvider → App 순서로 감쌈
   App.jsx                         라우트 정의 (React.lazy + Suspense로 페이지별 지연 로딩)
   api.js / utils.js / data.js     서버 요청 함수 / 공용 유틸(uid) / 데모 데이터(할 일·일정)
-  ragApi.js                       RAG API(backend/rag/api.py) 요청 함수 — /api/rag/documents 업로드·목록 조회 + chat()(/api/rag/chat 질의응답)
+  ragApi.js                       RAG API(backend/rag/api.py) 요청 함수 — /api/rag/documents 업로드·목록 조회·삭제 + chat()(/api/rag/chat 질의응답)
   ticketApi.js                    '할 일' 칸반 보드 API(backend/todo/api.py) 요청 함수 — 티켓 CRUD + move(드래그앤드롭) (2026-07-11 추가)
   reportApi.js                    보고서 API(backend/report/api.py) 요청 함수 — 서식 목록/AI 생성/hwpx 다운로드
   context/
@@ -79,7 +79,7 @@ src/
   pages/
     login/LoginPage.jsx            랜딩 히어로 + 로그인 폼 (내부 state로 전환, 별도 라우트 아님)
     dashboard/DashboardPage.jsx    홈(캘린더/할 일/메모) — 실제 완성된 보호 페이지
-    knowledge/KnowledgePage.jsx    지식 탭 — 문서 업로드(.txt/.md/.pdf/.docx/.hwpx) + 임베딩 색인 + 색인된 문서 목록 (2026-07-07 추가). 임베딩 지도(UMAP)는 2026-07-10 제거됨.
+    knowledge/KnowledgePage.jsx    지식 탭 — 문서 업로드(.txt/.md/.pdf/.docx/.hwpx) + 임베딩 색인 + 색인된 문서 목록 + 삭제(2026-08-04 추가) (2026-07-07 추가). 임베딩 지도(UMAP)는 2026-07-10 제거됨.
     reports/ReportsPage.jsx        보고서 탭 — 서식 선택 → 제목·내용·참고파일로 AI 본문 생성 → 섹션 편집·미리보기 → hwpx 다운로드 (2026-07-08 추가)
     chat/ChatPage.jsx              AI 채팅/회계챗 — 근거 기반 질의응답 (2026-07-08 추가). URL 파라미터 ?scope=회계 로 검색 분야를 걸어 회계챗/AI챗을 겸함(전체=필터 없음).
     agents/AgentsPage.jsx          에이전트 허브 — 분야별 전용 챗 카드(회계챗·예산챗 등). agentsConfig.js가 에이전트 목록(=데이터). 카드 클릭 시 /chat?scope=... 로 이동 (2026-07-08 추가, 2026-07-13 예산챗 추가).
@@ -90,7 +90,7 @@ src/
 vite.config.js                    react() + /api/{auth,rag,report,store} 프록시(→127.0.0.1:8000) + vitest 설정 (mockAuth는 2026-07-10 진짜 로그인으로 대체·제거)
 backend/
   main.py                         통합 진입점 — rag 앱에 보고서 라우터를 합쳐 한 서버로 띄움 (2026-07-08 추가). 실행 명령은 3장 참고.
-  rag/api.py                      RAG용 FastAPI 서버. POST/GET /api/rag/documents (업로드 시 전체 재색인), POST /api/rag/chat (근거 기반 질의응답). (umap 엔드포인트는 2026-07-10 제거)
+  rag/api.py                      RAG용 FastAPI 서버. POST/GET/DELETE /api/rag/documents (업로드·삭제 시 전체 재색인), POST /api/rag/chat (근거 기반 질의응답). (umap 엔드포인트는 2026-07-10 제거)
   rag/chat.py                     질의응답 엔진 (2026-07-08 추가) — 질문 임베딩→store.query(카테고리 필터)→Claude(claude-sonnet-5, urllib) 근거 기반 답변. 키 없으면 근거만 반환(fallback).
   auth/                           로그인 시스템 (2026-07-10 추가) — store.py(SQLite users/sessions, pbkdf2), api.py(login/logout/me + AuthMiddleware 문지기 + require_user), manage.py(계정 CLI). 토큰-헤더 방식.
   security.py                     보안 하드닝 (2026-07-10, 외부 커밋) — TrustedHostMiddleware(RSG_ALLOWED_HOSTS), body 크기 제한, 보안 헤더, 입력 검증.
@@ -125,7 +125,7 @@ backend/
 - 아이콘 전용 버튼(로그아웃, 검색, 할 일 체크 등)에 `aria-label` 부여. 클릭 동작이 없던 달력 날짜 칸은 `<button>`이 아닌 `<div>`로 처리(가짜 버튼 제거).
 - 모바일(≤760px) 대응: 사이드바가 오프캔버스로 전환되고 햄버거 메뉴로 열림. 대시보드 카드가 뷰포트 높이에 잘리던 버그를 발견해 수정함(2026-07-05).
 - 자동 테스트 3개(vitest): 미로그인 시 `/` 접근 시 로그인 화면 노출, 알 수 없는 주소는 404, Login 버튼 클릭 시 폼 노출.
-- **지식 탭(`/knowledge`, 2026-07-07 추가)**: `.txt`/`.md`/`.pdf`/`.docx`/`.hwpx` 파일을 내 PC에서 선택해 업로드하면 대/중/소분류(선택 입력) 메타데이터와 함께 `backend/rag/api.py`로 전송 → 서버가 저장·텍스트 추출·재색인(청킹→임베딩→ChromaDB)까지 수행하고 결과(청크 수)를 반환. 색인된 문서 목록(분류 배지 + 청크 수)을 조회해 보여줌. **RAG API 서버(uvicorn, 8000번 포트)가 떠 있어야 동작** — 3장 참고. curl/Python `requests`로 업로드·목록 조회 API 검증 완료(한글 파일명·카테고리, PDF/DOCX/HWPX 실제 파일 포함).
+- **지식 탭(`/knowledge`, 2026-07-07 추가)**: `.txt`/`.md`/`.pdf`/`.docx`/`.hwpx` 파일을 내 PC에서 선택해 업로드하면 대/중/소분류(선택 입력) 메타데이터와 함께 `backend/rag/api.py`로 전송 → 서버가 저장·텍스트 추출·재색인(청킹→임베딩→ChromaDB)까지 수행하고 결과(청크 수)를 반환. 색인된 문서 목록(분류 배지 + 청크 수)을 조회해 보여줌. **삭제(2026-08-04 추가)**: 목록의 휴지통 버튼 → `DELETE /api/rag/documents/{source:path}` → 원본 파일 삭제 + 빈 분류 폴더 정리 + 전체 재색인. 분류를 비워 올려 예산챗에 안 잡히는 문서를 화면에서 고칠 수 있게 된 것이 도입 이유. **RAG API 서버(uvicorn, 8000번 포트)가 떠 있어야 동작** — 3장 참고. curl/Python `requests`로 업로드·목록 조회 API 검증 완료(한글 파일명·카테고리, PDF/DOCX/HWPX 실제 파일 포함).
 - **보고서 탭(`/reports`, 2026-07-08 추가)**: 서식(계획보고서/결과보고서/업무보고/보도자료/개인보고서) 선택 → 제목·간단한 내용 입력 + 참고 파일(txt/md/csv/hwp/hwpx/docx, 최대 3개) 첨부 → Claude가 서식 목차에 맞춰 본문 JSON 생성(개조식, 서식별 작성 지침 자동 반영) → 섹션별 편집·표 위치 조정·미리보기 → 진짜 `.hwpx` 파일 다운로드(한글에서 열림). API 키 없으면 대체 생성기로 흐름 유지. 서식 추가는 `backend/report/templates/`에 마커 규약을 지킨 hwpx(+지침 md) 파일만 넣으면 됨 — 코드 수정 불필요. **개인보고서 서식(2026-07-17 추가, 당일 개정)**: 미니멀 서식(개요 상자·표 없음, 단일 '본문' 섹션). 정리 안 된 글을 통째로 넣으면 AI가 **내용을 분석해 핵심 목차(1., 2., ...)를 직접 도출**하고 각 목차 아래를 □(대항목, 선택)/○(핵심)/-(부연)로 구체화 — 목차 번호는 엔진이 자동 부여(sec 레벨). 이 서식은 '2~4블록' 분량 제한이 해제되어 던진 의견·사실을 누락 없이 담는다(max_tokens 16000, brief 한도 12000자). 이를 위해 엔진이 선택 마커(features) 체계와 sec·head 레벨을 지원하게 됨(엔진·컴포저·프론트 오프라인 검증 완료, 기존 4개 서식 회귀 통과 — 기존 서식에선 "1. " 시작 줄이 예전처럼 ○ 항목으로 유지됨). **엔진(조립·추출·프롬프트)은 업무 PC에서 오프라인 검증 완료, FastAPI 라우터 실행 검증은 개발 PC에서 필요** (venv에서 `uvicorn main:app` 후 탭 전체 흐름 확인).
 - **'할 일' 탭(`/todos`, 2026-07-11 추가) — 티켓 기반 칸반 보드**: 기존의 완료 체크만 되는 평면 리스트를 좌측 Backlog 사이드바 + 우측 3컬럼(TODO/In Progress/Done) 보드로 교체. 티켓 CRUD(제목·설명·우선순위·계획시작일·계획종료일), 네이티브 HTML5 드래그앤드롭으로 컬럼 이동·순서 변경, 검색, "이번주 업무"/"일정 초과 업무" 필터. 컬럼 이동에 따라 **시작일(startedAt)·종료일(completedAt)은 서버가 자동 기록**(TODO 진입 시 시작일, DONE 진입 시 종료일, 역방향 이동 시 초기화) — 계획일(사용자 입력)과 실제일(시스템 기록)을 분리 관리. Done 컬럼은 종료일 기준 24시간 이내 티켓만 노출(그 이후는 삭제하지 않고 DB에만 남음). 상세는 [docs/PRD.md](docs/PRD.md) 참고.
 

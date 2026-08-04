@@ -23,6 +23,13 @@ export const uploadDocument = (file, { categoryL1 = '', categoryL2 = '', categor
   return req('/api/rag/documents', { method: 'POST', body: formData })
 }
 
+// source는 "예산/지침.hwpx"처럼 슬래시를 포함한다. 백엔드 라우트가 {source:path}라
+// 구분자 슬래시는 그대로 두고 각 성분만 인코딩해야 한글·공백이 안전하게 전달된다.
+export const deleteDocument = (source) => {
+  const path = source.split('/').map(encodeURIComponent).join('/')
+  return req(`/api/rag/documents/${path}`, { method: 'DELETE' })
+}
+
 function chatBody({ question, categoryL1 = '', scopeLabel = '', topK } = {}) {
   const body = { question }
   if (categoryL1) body.category_l1 = categoryL1

@@ -126,6 +126,46 @@ async def upload_document(
     return {"source": source, "chunk_count": my_chunk_count, "total_chunks": len(chunks)}
 
 
+def _resolve_source_path(source: str) -> Path:
+    """목록의 source("예산/지침.hwpx")를 실제 파일 경로로 바꾼다. data/raw 밖은 거부한다.
+
+    업로드와 달리 하위 폴더(분류)를 살려야 해서 _safe_name을 쓸 수 없다.
+    대신 resolve()로 ../ 를 모두 펼친 뒤 data/raw 안인지 확인한다.
+    """
+    require_max_len(source, "source", 400)
+    raw_root = config.RAW_DOCS_DIR.resolve()
+    target = (config.RAW_DOCS_DIR / source).resolve()
+    if target == raw_root or not target.is_relative_to(raw_root):
+        raise HTTPException(400, "삭제 경로가 허용 범위를 벗어났습니다.")
+    if target.suffix.lower() not in SUPPORTED_SUFFIXES:
+        raise HTTPException(400, "색인 대상 문서가 아닙니다.")
+    return target
+
+
+@app.delete("/api/rag/documents/{source:path}")
+def delete_document(source: str):
+    """원본 문서를 지우고 전체를 재색인한다.
+
+    벡터DB는 _reindex_all()이 컬렉션을 비우고 다시 채우므로 남은 청크가 따로 없다.
+    분류를 잘못 넣어 올린 문서를 화면에서 정리하려면 이 엔드포인트가 필요하다.
+    """
+    target = _resolve_source_path(source)
+    if not target.is_file():
+        raise HTTPException(404, "문서를 찾을 수 없습니다: %s" % source)
+
+    target.unlink()
+
+    # 분류 폴더가 비었으면 같이 치운다(목록에 빈 분류가 남지 않도록). data/raw 자체는 남긴다.
+    raw_root = config.RAW_DOCS_DIR.resolve()
+    parent = target.parent
+    while parent != raw_root and parent.is_relative_to(raw_root) and not any(parent.iterdir()):
+        parent.rmdir()
+        parent = parent.parent
+
+    chunks = _reindex_all()
+    return {"source": source, "deleted": True, "total_chunks": len(chunks)}
+
+
 def _parse_chat_payload(payload: dict) -> tuple[str, str | None, int, str | None]:
     """/chat·/chat/stream 공통 입력 검증. (question, category_l1, top_k, scope_label) 반환."""
     question = (payload.get("question") or "").strip()

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
-import { FileText, Menu, UploadCloud } from 'lucide-react'
-import { listDocuments, uploadDocument } from '../../ragApi.js'
+import { FileText, Menu, Trash2, UploadCloud } from 'lucide-react'
+import { deleteDocument, listDocuments, uploadDocument } from '../../ragApi.js'
 import './KnowledgePage.css'
 
 export default function KnowledgePage() {
@@ -10,6 +10,7 @@ export default function KnowledgePage() {
   const [documents, setDocuments] = useState([])
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
+  const [deleting, setDeleting] = useState('')
   const [categoryL1, setCategoryL1] = useState('')
   const [categoryL2, setCategoryL2] = useState('')
   const [categoryL3, setCategoryL3] = useState('')
@@ -44,6 +45,22 @@ export default function KnowledgePage() {
     }
   }
 
+  const handleDelete = async (source) => {
+    if (!window.confirm(`"${source}"를 삭제할까요?\n\n원본 파일이 지워지고 전체 문서가 재색인됩니다. 되돌릴 수 없습니다.`)) return
+    setDeleting(source)
+    try {
+      const result = await deleteDocument(source)
+      notify(`"${source}" 삭제 완료 (남은 청크 ${result.total_chunks}개)`)
+      await refresh()
+    } catch (err) {
+      notify(`삭제 실패: ${err.message}`, 'error')
+    } finally {
+      setDeleting('')
+    }
+  }
+
+  const busy = uploading || deleting !== ''
+
   return (
     <div className="kb">
       <header className="kb-head">
@@ -55,11 +72,11 @@ export default function KnowledgePage() {
         <h2>문서 업로드</h2>
         <p className="kb-hint">.txt, .md, .pdf, .docx, .hwpx 파일을 지원합니다. 업로드하면 자동으로 텍스트 추출 → 청킹 → 임베딩 → 색인까지 진행됩니다.</p>
         <div className="kb-category-row">
-          <input placeholder="대분류 (예: 회계)" value={categoryL1} onChange={(e) => setCategoryL1(e.target.value)} disabled={uploading} />
-          <input placeholder="중분류 (예: 계약)" value={categoryL2} onChange={(e) => setCategoryL2(e.target.value)} disabled={uploading} />
-          <input placeholder="소분류 (예: 수의계약)" value={categoryL3} onChange={(e) => setCategoryL3(e.target.value)} disabled={uploading} />
+          <input placeholder="대분류 (예: 회계)" value={categoryL1} onChange={(e) => setCategoryL1(e.target.value)} disabled={busy} />
+          <input placeholder="중분류 (예: 계약)" value={categoryL2} onChange={(e) => setCategoryL2(e.target.value)} disabled={busy} />
+          <input placeholder="소분류 (예: 수의계약)" value={categoryL3} onChange={(e) => setCategoryL3(e.target.value)} disabled={busy} />
         </div>
-        <button className="kb-upload-btn" onClick={() => fileInputRef.current?.click()} disabled={uploading}>
+        <button className="kb-upload-btn" onClick={() => fileInputRef.current?.click()} disabled={busy}>
           <UploadCloud size={16} /> {uploading ? '임베딩 처리 중…' : '내 PC에서 문서 선택'}
         </button>
         <input ref={fileInputRef} type="file" accept=".txt,.md,.pdf,.docx,.hwpx" hidden onChange={handleFileChange} />
@@ -89,6 +106,15 @@ export default function KnowledgePage() {
                   </div>
                 </div>
                 <span className="kb-chunk-count">{doc.chunk_count}개 청크</span>
+                <button
+                  className="kb-doc-del"
+                  onClick={() => handleDelete(doc.source)}
+                  disabled={busy}
+                  title="문서 삭제"
+                  aria-label={`${doc.source} 삭제`}
+                >
+                  {deleting === doc.source ? '삭제 중…' : <Trash2 size={15} />}
+                </button>
               </li>
             ))}
           </ul>
