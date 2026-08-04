@@ -70,18 +70,25 @@
    ```bash
    railway login
    railway link        # 이 프로젝트/서비스 선택
-   railway run python -m rag.pipeline index
+   railway ssh -- python -m rag.pipeline index
    ```
+   - ⚠️ **`railway run`이 아니라 `railway ssh`다.** 이름이 비슷하지만 `railway run`은 **내 PC에서**
+     Railway의 환경변수만 빌려와 실행하는 명령이라, `RSG_DATA_DIR=/data`(리눅스 경로)를 로컬
+     Windows가 이해하지 못해 실패한다. `railway ssh`가 실제 배포 컨테이너 안에서 실행하는 명령이다.
+   - SSH 키가 없는 PC라면 먼저 `ssh-keygen` → `railway ssh keys add`로 등록해야 한다.
    - `data/raw`의 문서를 청킹→임베딩→ChromaDB 저장한다. (Upstage 임베딩 비용이 조금 발생)
    - 결과는 영구 볼륨(`/data`)에 저장되어 재배포해도 유지된다.
    - 이 명령은 **문서를 새로 추가했을 때만** 다시 실행한다(코드 배포 때마다 하지 않는다 — 비용/시간 낭비).
+   - 📌 **평소 문서 추가는 CLI가 아니라 지식 탭 업로드가 기본이다.** 웹 화면에서 올리면 서버가 파일을
+     `/data/raw`(볼륨)에 저장하고 재색인까지 자동으로 한다. 잘못 올린 문서는 목록의 휴지통 버튼으로
+     지운다(2026-08-04 추가). 이 CLI 절차는 **최초 구축·대량 이관·복구용**이다.
 7. **로그인 계정 만들기** — 같은 방식으로 팀원 계정을 만든다(공개 회원가입은 없다):
    ```bash
-   railway run python -m auth.manage add <아이디> <비밀번호> "<표시이름>"
-   railway run python -m auth.manage list        # 만든 계정 확인
+   railway ssh -- python -m auth.manage add <아이디> <비밀번호> "<표시이름>"
+   railway ssh -- python -m auth.manage list        # 만든 계정 확인
    ```
    - 계정 정보(users)와 워크스페이스 데이터는 영구 볼륨의 `app.db`에 저장되어 재배포해도 유지된다.
-   - 비밀번호 변경: `railway run python -m auth.manage passwd <아이디> <새 비번>`, 삭제: `... delete <아이디>`.
+   - 비밀번호 변경: `railway ssh -- python -m auth.manage passwd <아이디> <새 비번>`, 삭제: `... delete <아이디>`.
 
 ---
 
@@ -113,12 +120,19 @@
 ## 6. 이후의 개발 흐름 (한 번 세팅한 뒤로는 이게 전부)
 
 - **코드 수정**: 그냥 `git push` → Vercel·Railway가 **자동으로** 새 버전 배포. 신경 쓸 것 없음.
-- **문서 추가/변경**: 새 문서를 `data/raw/`에 넣고 `git push` → `railway run python -m rag.pipeline
-  index`로 벡터DB 갱신(Railway CLI, 위 3-6 참고). 코드 배포와 분리된 수동 단계다.
+- **문서 추가/변경**: **지식 탭에서 업로드**하면 끝이다. 서버가 볼륨(`/data/raw`)에 저장하고 재색인까지
+  자동으로 한다. 잘못 올렸으면 목록의 휴지통 버튼으로 지운다(지우면 다시 재색인된다).
+  - ⚠️ **대분류를 꼭 채운다.** 분류는 입력값이 아니라 **저장된 폴더 위치**에서 자동으로 도출된다
+    (`chunker.py`의 `_category_from_path`). 비워두면 `data/raw` 바로 아래 저장돼 `category_l1`이
+    빈 값이 되고, **예산챗·회계챗 같은 분류별 챗에서 검색되지 않는다**(전체 AI 채팅에서만 나옴).
+- **저장소에도 원본을 남기려면** `data/raw/`에 같은 파일을 넣고 `git push` 한다. 다만 이건 **백업·다른 PC
+  동기화용일 뿐, 서버에는 반영되지 않는다** — Railway는 Root Directory(`backend`)만 컨테이너에 넣어
+  저장소 루트의 `data/raw`를 아예 포함하지 않기 때문이다(8절 참고). 서버 반영은 위의 지식 탭 업로드로 한다.
 - **아무것도 안 바꿈**: 벡터DB는 영구 볼륨에 그대로 유지된다.
 
-> 참고: 웹 화면의 문서 업로드 기능으로 올린 파일은 서버에서 **임시**다(재배포 시 사라짐).
-> 문서를 영구히 추가하려면 위처럼 `data/raw`에 넣고 git으로 올린 뒤 재색인하는 방식을 쓴다.
+> 참고: 웹 화면으로 올린 문서는 **영구히 남는다**(2026-07-29 Railway 이전 후 기준). `RAW_DOCS_DIR`가
+> 이 환경에서 `/data/raw`로 잡히고 `/data`가 영구 볼륨이라 재배포해도 유지된다. (Render 시절에는 업로드
+> 파일이 저장소 클론 안에 떨어져 재배포 시 사라졌는데, 그 시절 설명이 오래 남아 있었다.)
 
 ---
 
