@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """평범한 hwpx 문서 → 보고서 서식(템플릿) 자동 변환.
 
-담당자가 한글에서 자리마다 [[제목]] [[개요]] [[대제목]] [[소제목]] 같은 '표시어'만
-적어 올리면, 이 모듈이 그것을 엔진이 아는 마커({{TITLE}}, ○ {{ITEM}} …)로 바꿔
+담당자가 한글에서 자리마다 제목·개요·대제목·소제목 같은 '표시어'만 한 줄씩 적어
+올리면, 이 모듈이 그것을 엔진이 아는 마커({{TITLE}}, ○ {{ITEM}} …)로 바꿔
 바로 쓸 수 있는 서식 파일로 만들어 준다.
 
 세 단계로 검사하고, 실패하면 담당자가 무엇을 고쳐야 하는지 한국어로 돌려준다:
@@ -11,8 +11,11 @@
   3차 시험 생성   — 실제로 문서를 한 번 만들어 보고 성공해야 통과     (convert 끝부분)
 
 설계 요점:
-  - 표시어는 반드시 [[ ]] 로 감싼다. 그냥 '제목'이라고 쓰면 본문에 우연히 들어간
-    같은 낱말까지 바뀌므로 허용하지 않고, 대신 친절한 안내 문구를 돌려준다.
+  - 표시어는 '제목'처럼 그냥 적어도 되고 '[[제목]]'처럼 감싸도 된다. 다만 **문단 전체가
+    딱 그 낱말일 때만** 인정하므로 '추진 내용' 같은 본문 줄은 건드리지 않는다.
+    (실제 서식 5종·실제 공문서를 조사한 결과 표시어와 똑같은 단독 문단은 없었다.)
+    낱말로 적었을 때는 무엇을 몇 곳 바꿨는지 경고로 알려 담당자가 눈으로 확인하게 한다.
+    대괄호를 하나라도 썼으면 대괄호만 인정한다 — 섞어 쓰면 헷갈리기 때문.
   - 한글은 한 줄 안에서 글꼴이 바뀌면 글자를 여러 조각으로 쪼개 저장한다.
     그래서 조각 단위가 아니라 '문단 전체 글자를 이어붙여' 표시어를 찾는다.
   - 목차별 견본(목차/□/○/-)은 원본 위치에서 걷어낸 뒤 한 덩어리로 다시 끼워 넣는다.
@@ -151,16 +154,22 @@ def _set_para_text(chunk: str, text: str) -> str:
 # ────────────────────────────────────────────────────────────────
 #  2차 — 표시어 → 마커
 # ────────────────────────────────────────────────────────────────
-def _replace_words(xml: str) -> tuple[str, dict, list[str]]:
-    """[[표시어]] 를 마커로 치환. → (새 xml, 마커별 개수, 오류)"""
-    bare_hits: dict[str, int] = {}
-    counts: dict[str, int] = {}
-    edits = []
+def _replace_words(xml: str) -> tuple[str, dict, list[str], list[str]]:
+    """표시어를 마커로 치환. → (새 xml, 마커별 개수, 오류, 경고)
+
+    두 가지로 적을 수 있다:
+      [[대제목]]  — 권장. 본문 낱말과 헷갈릴 일이 없다.
+      대제목      — 그냥 낱말로 적어도 된다. 단, 문단 전체가 딱 그 낱말일 때만 인정한다
+                    ('추진 내용' 같은 줄은 건드리지 않는다).
+    대괄호를 하나라도 썼으면 대괄호만 인정한다 — 섞어 쓰면 어느 쪽이 적용됐는지 헷갈리기 때문.
+    """
     word_to_marker = {w: m for w, m, _ in WORD_MARKERS}
+    bracket: list[tuple[int, int, str, str]] = []   # (시작, 끝, 낱말, 마커)
+    plain: list[tuple[int, int, str, str]] = []
+    unknown: dict[str, int] = {}
 
     for s, e in _inner_paragraphs(xml):
-        chunk = xml[s:e]
-        txt = _text_of(chunk).strip()
+        txt = _text_of(xml[s:e]).strip()
         if not txt:
             continue
         m = re.fullmatch(r"\[\[\s*([^\[\]]+?)\s*\]\]", txt)
@@ -168,29 +177,41 @@ def _replace_words(xml: str) -> tuple[str, dict, list[str]]:
             word = m.group(1)
             marker = word_to_marker.get(word)
             if marker is None:
-                bare_hits.setdefault("__unknown__:" + word, 0)
-                bare_hits["__unknown__:" + word] += 1
-                continue
-            counts[marker] = counts.get(marker, 0) + 1
-            edits.append((s, e, _set_para_text(chunk, marker)))
+                unknown[word] = unknown.get(word, 0) + 1
+            else:
+                bracket.append((s, e, word, marker))
         elif txt in word_to_marker:
-            bare_hits[txt] = bare_hits.get(txt, 0) + 1
+            plain.append((s, e, txt, word_to_marker[txt]))
 
-    errors = []
-    unknown = {k.split(":", 1)[1]: v for k, v in bare_hits.items() if k.startswith("__unknown__:")}
+    errors, warnings = [], []
     if unknown:
         errors.append("알 수 없는 표시어입니다: %s → 쓸 수 있는 표시어는 %s 입니다."
                       % (", ".join("[[%s]]" % u for u in unknown),
                          ", ".join("[[%s]]" % w for w, _, _ in WORD_MARKERS)))
-    plain = {k: v for k, v in bare_hits.items() if not k.startswith("__unknown__:")}
-    if plain and not counts:
-        errors.append("표시어는 대괄호 두 개로 감싸야 합니다. %s 처럼 적어주세요. "
-                      "(지금은 %s 라고만 적혀 있습니다)"
-                      % (", ".join("[[%s]]" % k for k in plain), ", ".join(plain)))
-    elif plain:
-        errors.append("대괄호가 빠진 표시어가 있습니다: %s → %s 로 고쳐주세요."
-                      % (", ".join(plain), ", ".join("[[%s]]" % k for k in plain)))
-    return _apply_edits(xml, edits), counts, errors
+
+    if bracket:
+        chosen = bracket
+        if plain:
+            warnings.append("대괄호를 쓴 표시어가 있어, 대괄호 없이 적힌 낱말(%s)은 표시어로 보지 않고 "
+                            "그대로 두었습니다. 섞어 쓰지 말고 한쪽으로 통일해 주세요."
+                            % ", ".join(sorted({w for _, _, w, _ in plain})))
+    else:
+        chosen = plain
+        if plain:
+            tally: dict[str, int] = {}
+            for _s, _e, w, _m in plain:
+                tally[w] = tally.get(w, 0) + 1
+            warnings.append("대괄호 없이 적힌 낱말을 표시어로 인식했습니다 — %s. "
+                            "본문에 넣으려던 낱말이 바뀌었다면 [[%s]] 처럼 대괄호로 감싸 다시 올려주세요."
+                            % (", ".join("%s %d곳" % (w, c) for w, c in tally.items()),
+                               sorted(tally)[0]))
+
+    counts: dict[str, int] = {}
+    edits = []
+    for s, e, _w, marker in chosen:
+        counts[marker] = counts.get(marker, 0) + 1
+        edits.append((s, e, _set_para_text(xml[s:e], marker)))
+    return _apply_edits(xml, edits), counts, errors, warnings
 
 
 # ────────────────────────────────────────────────────────────────
@@ -223,9 +244,8 @@ def _normalize_blocks(xml: str) -> tuple[str, list[str], list[str], list[str]]:
 
     missing = [WORD_OF_MARKER[m] for m in BLOCK_REQUIRED if m not in samples]
     if missing:
-        errors.append("필수 표시어가 없습니다: %s. 본문에 %s 를 넣어주세요."
-                      % (", ".join("[[%s]]" % w for w in missing),
-                         " 와 ".join("[[%s]]" % w for w in missing)))
+        errors.append("필수 표시어가 없습니다: %s. 내용이 들어갈 자리에 한 줄씩 적어주세요."
+                      % ", ".join(missing))
         return xml, [], steps, errors
 
     use = [m for m in BLOCK_ORDER if m in samples]   # 이 서식이 쓰는 단계들
@@ -370,13 +390,14 @@ def convert(filename: str, data: bytes) -> dict:
     if "<hp:p>" in xml:
         warnings.append("문서 안에 속성 없는 문단이 있어 일부가 인식되지 않을 수 있습니다.")
 
-    xml, counts, errors = _replace_words(xml)
+    xml, counts, errors, w2 = _replace_words(xml)
+    warnings += w2
     if errors:
         raise ConvertError(errors, warnings)
     if not counts:
-        raise ConvertError(["표시어를 하나도 찾지 못했습니다. 한글에서 [[제목]] [[대제목]] "
-                            "[[소제목]] 처럼 대괄호 두 개로 감싸 적어주세요. "
-                            "표시어 한 개는 한 줄에 단독으로 적어야 합니다."], warnings)
+        raise ConvertError(["표시어를 하나도 찾지 못했습니다. 내용이 들어갈 자리에 제목·대제목·소제목 "
+                            "같은 표시어를 적어주세요. 표시어는 한 줄에 하나만 단독으로 적어야 합니다 "
+                            "— 다른 글자와 같은 줄에 있으면 인식되지 않습니다."], warnings)
 
     steps = ["표시어 %d곳을 서식 마커로 바꿨습니다." % sum(counts.values())]
     xml, labels, s2, errors = _normalize_blocks(xml)

@@ -395,13 +395,15 @@ export default function ReportsPage() {
               <>
                 <p className="rp-hint">
                   한글에서 원하는 서식을 만든 뒤, 내용이 들어갈 자리에 <b>표시어</b>를 적어 저장하세요.
-                  표시어는 <b>대괄호 두 개</b>로 감싸고, <b>한 줄에 하나만</b> 단독으로 적습니다.
+                  표시어는 <b>한 줄에 하나만</b> 단독으로 적습니다(다른 글자와 같은 줄에 있으면 인식되지 않습니다).
                   글꼴·여백·표 디자인은 적어 둔 그대로 유지됩니다.
+                  <br />본문에 같은 낱말이 들어가 헷갈릴 때만 <code>[[제목]]</code>처럼 대괄호 두 개로 감싸세요
+                  (감쌌다면 문서 전체를 그 방식으로 통일해야 합니다).
                 </p>
                 <ul className="rp-words">
                   {MARKER_WORDS.map((m) => (
                     <li key={m.word} className={m.required ? 'req' : ''}>
-                      <code>[[{m.word}]]</code>
+                      <code>{m.word}</code>
                       <span>{m.desc}</span>
                       {m.required && <em>필수</em>}
                     </li>
