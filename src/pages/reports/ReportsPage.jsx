@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
-import { Download, FilePenLine, Menu, Paperclip, Sparkles } from 'lucide-react'
-import { composeReport, generateReport, getReportStatus, listTemplates } from '../../reportApi.js'
+import { ChevronDown, ChevronRight, Download, FilePenLine, FilePlus2, Menu, Paperclip, Sparkles, Trash2 } from 'lucide-react'
+import {
+  checkTemplateFile, composeReport, createTemplate, deleteTemplate,
+  generateReport, getReportStatus, listTemplates,
+} from '../../reportApi.js'
 import './ReportsPage.css'
 
 // 문서 편집 상태의 빈 값을 만든다. 서식이 바뀌면 섹션 개수가 달라지므로 매번 새로 만든다.
@@ -46,9 +49,23 @@ const parseBlocks = (text, feats) => (text || '').split('\n')
     return { level: 'item', text: line.replace(/^○\s*/, '') }
   })
 
+// 담당자가 한글 문서에 적어 넣는 표시어 — 백엔드 template_builder.WORD_MARKERS 와 짝을 이룬다
+const MARKER_WORDS = [
+  { word: '제목', desc: '문서 제목이 들어갈 자리', required: true },
+  { word: '개요', desc: '개요 상자 (없는 서식이면 생략)', required: false },
+  { word: '목차', desc: '번호 목차 (AI가 목차를 짜는 서식용)', required: false },
+  { word: '대항목', desc: '□ 소제목 묶음', required: false },
+  { word: '대제목', desc: '○ 항목 — 한 줄만 견본으로', required: true },
+  { word: '소제목', desc: '- 세부 — 한 줄만 견본으로', required: true },
+  { word: '표제목', desc: '표 위 캡션', required: false },
+  { word: '머리글', desc: '표 첫 줄 4칸에 각각', required: false },
+  { word: '표내용', desc: '표 둘째 줄 4칸에 각각', required: false },
+]
+
 export default function ReportsPage() {
   const { notify, onMenu } = useOutletContext()
   const fileInputRef = useRef(null)
+  const tplFileRef = useRef(null)
 
   const [templates, setTemplates] = useState([])
   const [tplId, setTplId] = useState('')
@@ -65,6 +82,16 @@ export default function ReportsPage() {
   // ② 문서 편집 상태
   const [doc, setDoc] = useState(emptyDoc(null))
   const [generating, setGenerating] = useState(false)
+
+  // ③ 서식 만들기 (샘플 hwpx → 서식 자동 변환·등록)
+  const [tplOpen, setTplOpen] = useState(false)
+  const [tFile, setTFile] = useState(null)
+  const [tName, setTName] = useState('')
+  const [tGuide, setTGuide] = useState('')
+  const [tBusy, setTBusy] = useState('')        // '' | 'check' | 'save'
+  const [tPass, setTPass] = useState(null)      // 검사 통과 결과 { sections, features, steps }
+  const [tErrors, setTErrors] = useState([])
+  const [tWarnings, setTWarnings] = useState([])
 
   const tpl = useMemo(() => templates.find((t) => t.id === tplId), [templates, tplId])
   // 서식이 지원하는 기능(개요 상자·표·□ 대항목). 옛 응답엔 features가 없으므로 전부 지원으로 간주
@@ -145,6 +172,73 @@ export default function ReportsPage() {
       notify(`다운로드 실패: ${err.message}`, 'error')
     } finally {
       setGenerating(false)
+    }
+  }
+
+  // ── 서식 만들기 ──────────────────────────────────────────────
+  const resetTplCheck = () => { setTPass(null); setTErrors([]); setTWarnings([]) }
+
+  const pickTplFile = (event) => {
+    const f = event.target.files[0]
+    event.target.value = ''
+    if (!f) return
+    resetTplCheck()
+    setTFile(f)
+    if (!tName.trim()) setTName(f.name.replace(/\.hwpx$/i, ''))
+  }
+
+  const handleTplCheck = async () => {
+    if (!tFile) return
+    setTBusy('check')
+    resetTplCheck()
+    try {
+      const out = await checkTemplateFile(tFile)
+      setTPass(out)
+      setTWarnings(out.warnings || [])
+    } catch (err) {
+      setTErrors(err.errors?.length ? err.errors : [err.message])
+      setTWarnings(err.warnings || [])
+    } finally {
+      setTBusy('')
+    }
+  }
+
+  const saveTemplate = async (overwrite) => {
+    setTBusy('save')
+    try {
+      const out = await createTemplate({ file: tFile, name: tName, guide: tGuide, overwrite })
+      const list = await listTemplates()
+      setTemplates(list)
+      setTplId(out.id)
+      setDoc(emptyDoc(list.find((t) => t.id === out.id)))
+      setTFile(null); setTName(''); setTGuide(''); resetTplCheck()
+      notify(`'${out.name}' 서식을 등록했습니다. 위 서식 목록에서 바로 쓸 수 있습니다.`)
+    } catch (err) {
+      // 같은 이름이 이미 있거나 기본 서식과 겹치면(409) 서버가 준 사유를 그대로 보여주고 다시 묻는다
+      if (err.status === 409 && !overwrite
+          && window.confirm(`${err.errors?.[0] || `'${tName}' 서식이 이미 있습니다.`}\n\n계속할까요?`)) {
+        setTBusy('')
+        return saveTemplate(true)
+      }
+      setTErrors(err.errors?.length ? err.errors : [err.message])
+    } finally {
+      setTBusy('')
+    }
+  }
+
+  const handleTplDelete = async (t) => {
+    if (!window.confirm(`'${t.name}' 서식을 삭제할까요? 작성 지침도 함께 지워집니다.`)) return
+    try {
+      await deleteTemplate(t.id)
+      const list = await listTemplates()
+      setTemplates(list)
+      if (tplId === t.id) {
+        setTplId(list[0]?.id || '')
+        setDoc(emptyDoc(list[0]))
+      }
+      notify(`'${t.name}' 서식을 삭제했습니다.`)
+    } catch (err) {
+      notify(`삭제 실패: ${err.errors?.[0] || err.message}`, 'error')
     }
   }
 
@@ -287,6 +381,104 @@ export default function ReportsPage() {
             <button className="rp-primary" onClick={handleDownload} disabled={generating || !doc.title.trim()}>
               <Download size={15} /> {generating ? '생성 중…' : 'HWPX 다운로드'}
             </button>
+          </section>
+
+          {/* ── 서식 만들기: 표시어만 적은 한글 문서 → 서식으로 자동 변환 ── */}
+          <section className="rp-card rp-tpl">
+            <h2 className="rp-fold" onClick={() => setTplOpen((o) => !o)}>
+              {tplOpen ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
+              <FilePlus2 size={15} /> 서식 만들기
+              <span className="rp-sub">한글 문서를 올려 새 서식 등록</span>
+            </h2>
+
+            {tplOpen && (
+              <>
+                <p className="rp-hint">
+                  한글에서 원하는 서식을 만든 뒤, 내용이 들어갈 자리에 <b>표시어</b>를 적어 저장하세요.
+                  표시어는 <b>대괄호 두 개</b>로 감싸고, <b>한 줄에 하나만</b> 단독으로 적습니다.
+                  글꼴·여백·표 디자인은 적어 둔 그대로 유지됩니다.
+                </p>
+                <ul className="rp-words">
+                  {MARKER_WORDS.map((m) => (
+                    <li key={m.word} className={m.required ? 'req' : ''}>
+                      <code>[[{m.word}]]</code>
+                      <span>{m.desc}</span>
+                      {m.required && <em>필수</em>}
+                    </li>
+                  ))}
+                </ul>
+
+                <label>샘플 한글 문서 <span className="rp-sub">hwpx · 최대 5MB</span></label>
+                <button className="rp-attach" onClick={() => tplFileRef.current?.click()} disabled={!!tBusy}>
+                  <Paperclip size={14} /> {tFile ? tFile.name : '파일 선택'}
+                </button>
+                <input ref={tplFileRef} type="file" hidden accept=".hwpx" onChange={pickTplFile} />
+
+                <button className="rp-attach rp-check-btn" onClick={handleTplCheck} disabled={!tFile || !!tBusy}>
+                  {tBusy === 'check' ? '검사 중…' : '① 검사하기'}
+                </button>
+
+                {tErrors.length > 0 && (
+                  <div className="rp-diag err">
+                    <strong>서식으로 만들 수 없습니다. 아래를 고쳐서 다시 올려주세요.</strong>
+                    <ul>{tErrors.map((e, i) => <li key={i}>{e}</li>)}</ul>
+                  </div>
+                )}
+                {tWarnings.length > 0 && (
+                  <div className="rp-diag warn">
+                    <strong>확인해 주세요</strong>
+                    <ul>{tWarnings.map((w, i) => <li key={i}>{w}</li>)}</ul>
+                  </div>
+                )}
+                {tPass && (
+                  <div className="rp-diag ok">
+                    <strong>✓ 서식으로 쓸 수 있습니다</strong>
+                    <ul>
+                      <li>목차 {tPass.sections.length}개: {tPass.sections.join(' · ')}</li>
+                      <li>
+                        지원 기능: {[
+                          tPass.features.overview && '개요', tPass.features.table && '표',
+                          tPass.features.sec && '번호 목차', tPass.features.head && '□ 대항목',
+                        ].filter(Boolean).join(' · ') || '기본 항목만'}
+                      </li>
+                      {tPass.steps.map((s, i) => <li key={i}>{s}</li>)}
+                    </ul>
+                  </div>
+                )}
+
+                {tPass && (
+                  <>
+                    <label>서식 이름 * <span className="rp-sub">목록에 표시될 이름</span></label>
+                    <input value={tName} onChange={(e) => setTName(e.target.value)}
+                      placeholder="예: 검토보고서" disabled={!!tBusy} />
+                    <label>작성 지침 <span className="rp-sub">선택 · AI에게 줄 이 서식만의 규칙</span></label>
+                    <textarea rows={3} value={tGuide} onChange={(e) => setTGuide(e.target.value)}
+                      disabled={!!tBusy} placeholder="예: 목차는 5개를 넘지 않는다. 결론을 첫 줄에 쓴다." />
+                    <button className="rp-primary" onClick={() => saveTemplate(false)}
+                      disabled={!tName.trim() || !!tBusy}>
+                      <FilePlus2 size={15} /> {tBusy === 'save' ? '등록 중…' : '② 서식으로 등록'}
+                    </button>
+                  </>
+                )}
+
+                <label>등록된 서식 <span className="rp-sub">기본 서식은 지울 수 없습니다</span></label>
+                <ul className="rp-tpllist">
+                  {templates.map((t) => (
+                    <li key={t.id}>
+                      <span>{t.name}</span>
+                      <span className="rp-sub">
+                        {t.builtin ? '기본' : '내가 등록'} · {t.sections.length}개 섹션{t.has_guide ? ' · 지침' : ''}
+                      </span>
+                      {!t.builtin && (
+                        <button onClick={() => handleTplDelete(t)} aria-label={`${t.name} 삭제`} title="삭제">
+                          <Trash2 size={13} />
+                        </button>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
           </section>
         </div>
 

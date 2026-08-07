@@ -56,6 +56,38 @@
 .rp-grid td { padding: 2px; }
 .rp-grid input { padding: 7px 8px !important; font-size: 12px !important; }
 
+/* ── 서식 만들기 ── */
+.rp-fold { cursor: pointer; user-select: none; }
+.rp-fold:hover { color: var(--violet); }
+
+.rp-words { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 4px; }
+.rp-words li { display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: #8a8a8a; }
+.rp-words code { flex: 0 0 76px; padding: 2px 6px; border-radius: 5px; background: #1c1c1c;
+  border: 1px solid #2a2a2a; color: #c9c9c9; font-size: 11px; text-align: center; }
+.rp-words li.req code { border-color: rgba(139,126,232,.5); color: var(--violet); }
+.rp-words em { margin-left: auto; font-style: normal; font-size: 10.5px; color: var(--violet); }
+
+.rp-check-btn { display: flex; width: 100%; justify-content: center; margin-top: 8px; }
+
+.rp-diag { margin-top: 12px; padding: 10px 12px; border-radius: 9px; font-size: 12px; line-height: 1.65;
+  border: 1px solid #2a2a2a; background: #121212; }
+.rp-diag strong { display: block; margin-bottom: 5px; font-size: 12.5px; }
+.rp-diag ul { margin: 0; padding-left: 16px; display: grid; gap: 3px; color: #9a9a9a; }
+.rp-diag.err { border-color: rgba(239,68,68,.45); background: rgba(239,68,68,.07); }
+.rp-diag.err strong { color: var(--red); }
+.rp-diag.warn { border-color: rgba(242,183,5,.45); background: rgba(242,183,5,.07); }
+.rp-diag.warn strong { color: var(--yellow); }
+.rp-diag.ok { border-color: rgba(31,162,90,.45); background: rgba(31,162,90,.07); }
+.rp-diag.ok strong { color: var(--green); }
+
+.rp-tpllist { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 5px; }
+.rp-tpllist li { display: flex; align-items: center; gap: 8px; font-size: 12.5px;
+  padding: 7px 10px; border: 1px solid #242424; border-radius: 8px; background: #121212; }
+.rp-tpllist .rp-sub { margin-left: 0; font-size: 11px; }
+.rp-tpllist button { margin-left: auto; display: inline-flex; padding: 4px; border: 0; border-radius: 6px;
+  background: transparent; color: #6a6a6a; cursor: pointer; }
+.rp-tpllist button:hover { background: rgba(239,68,68,.14); color: var(--red); }
+
 /* ── 미리보기: 다크 화면 위의 흰 종이 ── */
 .rp-doc { background: #fff; color: #1a1a1a; max-width: 720px; margin: 0 auto; border-radius: 6px;
   padding: 40px 44px; font-family: '맑은 고딕', 'Malgun Gothic', sans-serif; }

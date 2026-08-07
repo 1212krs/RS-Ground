@@ -30,6 +30,14 @@ import xml.etree.ElementTree as ET
 TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
 COMMON_GUIDE_PATH = TEMPLATES_DIR / "_공통지침.md"
 
+# 담당자가 화면에서 등록한 서식이 저장되는 곳.
+#   개발(내 PC): repo/data/templates
+#   배포(Railway): RSG_DATA_DIR(영구 볼륨, 예: /data)/templates
+# 위 TEMPLATES_DIR 은 코드와 함께 배포되는 '기본 서식'이라 재배포 때마다 새로 덮이지만,
+# 여기는 영구 볼륨이라 재배포해도 남는다. 같은 이름이면 등록 서식이 기본 서식을 덮어쓴다.
+USER_TEMPLATES_DIR = Path(os.environ.get("RSG_DATA_DIR")
+                          or (Path(__file__).resolve().parents[2] / "data")) / "templates"
+
 # 필수 마커 — 없으면 서식 등록 거부. 그 외는 선택(있으면 features로 노출):
 #   {{OVERVIEW}}(개요 상자) · 1. {{SEC}}(AI가 도출하는 번호 목차, 자동 번호 부여)
 #   · □ {{HEAD}}(대항목 단계) · 표 3종({{TBL_CAPTION}}/{{TH}}/{{TD}})
@@ -101,13 +109,23 @@ def analyze_template(path: Path) -> dict:
 
 
 def list_templates() -> list[dict]:
-    out = []
-    for fn in sorted(TEMPLATES_DIR.glob("*.hwpx")):
-        try:
-            out.append(analyze_template(fn))
-        except Exception as ex:  # DRM 감염·마커 훼손 등 — 해당 서식만 제외
-            print("[report] 템플릿 제외 %s: %s" % (fn.name, ex))
-    return out
+    """등록 서식(영구 볼륨) + 기본 서식(코드 동봉). 같은 이름이면 등록 서식이 이긴다."""
+    out, seen = [], set()
+    for folder, builtin in ((USER_TEMPLATES_DIR, False), (TEMPLATES_DIR, True)):
+        if not folder.exists():
+            continue
+        for fn in sorted(folder.glob("*.hwpx")):
+            if fn.stem in seen:
+                continue
+            try:
+                info = analyze_template(fn)
+            except Exception as ex:  # DRM 감염·마커 훼손 등 — 해당 서식만 제외
+                print("[report] 템플릿 제외 %s: %s" % (fn.name, ex))
+                continue
+            info["builtin"] = builtin
+            seen.add(fn.stem)
+            out.append(info)
+    return sorted(out, key=lambda t: t["id"])
 
 
 def get_template(tpl_id: str) -> dict:
